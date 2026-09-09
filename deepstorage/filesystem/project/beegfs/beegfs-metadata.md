@@ -297,23 +297,23 @@ metadata objects ≈ directories
 宽条带会扩大 inode 序列化信息；ACL、用户 xattr、RST 元数据也增加 inode/xattr 负载。ext4 的 inode 数在格式化时固定，
 耗尽后即使还有大量 byte capacity 也无法继续创建。
 
-## 10. 对 LightStore 的直接启示
+## 10. 设计启示
 
 ### 值得借鉴
 
-- **控制面不进入数据路径**：客户端缓存布局并直连 DataServer，方向与 LightStore 一致。
+- **控制面不进入数据路径**：客户端缓存布局并直连存储服务，是分布式文件系统应坚持的方向。
 - **明确的 EntryID 贯穿元数据和物理对象**：有利于 fsck、日志和孤儿定位。
-- **动态属性带单调 version**：可用于拒绝乱序 storage response，适合 LightStore 的异步元数据汇总。
+- **动态属性带单调 version**：可用于拒绝乱序 storage response，适合任何异步汇总元数据的设计。
 - **disposal 语义**：为 open-unlink/延迟回收建立显式状态，而不是把特殊情况散落在 GC。
 - **双维 target state**：reachability 与 consistency 分离，避免把“在线但需 resync”压成一个布尔值。
 
 ### 不应照搬
 
-- LightStore 的目标是 `10^12–10^13` 文件，不能让单目录固定落在一个 metadata shard；需要 Range split、目录 hash shard
+- 以 `10^12` 量级以上文件为目标的系统，不能让单目录固定落在一个 metadata shard；需要分片 split、目录 hash shard
   或显式限制/自动分桶。
-- 本地“一文件一对象”与 LightStore append-only volume packing 的小文件目标相反。
-- 主副本本地成功后异步标记副本 resync 的模型弱于 Raft committed state；LightStore metadata 不应退回该模型。
-- 依赖底层 hardlink/xattr 虽开发高效，但把磁盘格式、备份和校验强绑定到单机 FS，不适合 LightStore 自定义全局 metadata engine。
+- 本地“一文件一对象”与海量小文件场景所需的打包式布局相反。
+- 主副本本地成功后异步标记副本 resync 的模型弱于 Raft committed state；已用共识协议保护元数据的系统不应退回该模型。
+- 依赖底层 hardlink/xattr 虽开发高效，但把磁盘格式、备份和校验强绑定到单机 FS，不适合需要自定义全局 metadata engine 的系统。
 
 ## 11. 建议验证用例
 

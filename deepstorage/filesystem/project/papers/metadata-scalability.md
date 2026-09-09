@@ -2,7 +2,7 @@
 
 > 调研日期：2026-08-15
 >
-> 范围说明：本文调研 2020 年（含）之后发表于系统领域主要会议（FAST / OSDI / SOSP / ATC / EuroSys / ASPLOS / NSDI / SoCC 等）的、聚焦分布式文件系统（Distributed File System, DFS）元数据（metadata）扩展性与性能的学术论文。所有论文均通过 Web 搜索逐篇核实其真实存在、发表会议与年份；不确定之处显式标注"待确认"。调研目的：为本仓库 LightStore（C++ 实现，manager / metaserver / dataserver 三组件架构）的 metaserver 设计提供参考。
+> 范围说明：本文调研 2020 年（含）之后发表于系统领域主要会议（FAST / OSDI / SOSP / ATC / EuroSys / ASPLOS / NSDI / SoCC 等）的、聚焦分布式文件系统（Distributed File System, DFS）元数据（metadata）扩展性与性能的学术论文。所有论文均通过 Web 搜索逐篇核实其真实存在、发表会议与年份；不确定之处显式标注"待确认"。调研目的：为分布式文件系统元数据服务的设计提供参考。
 
 ---
 
@@ -78,7 +78,7 @@ POSIX 语义要求逐级检查路径上每一级目录的存在性与权限。�
   - **存储引擎**：ZippyDB（线性一致、容错、分片 KV，底层 RocksDB）。
 - **关键实验结果**：生产环境单集群管理 EB 级数据、数十亿文件，支撑 blob 与数仓两类租户的混合负载。
 - **局限性**：放弃部分 POSIX 语义（跨分片原子 rename、递归属性）；逐级路径解析延迟随深度增长。
-- **对 LightStore 的启示**：分层（name/file/block 三张表）+ 按各自 ID hash 分区是工业界验证过的可扩展底座；"metaserver 无状态、状态全部下沉到事务 KV"的模式使扩容与故障恢复大为简化。若 LightStore 不要求严格 POSIX rename，可采用同款取舍。
+- **设计启示**：分层（name/file/block 三张表）+ 按各自 ID hash 分区是工业界验证过的可扩展底座；"元数据服务无状态、状态全部下沉到事务 KV"的模式使扩容与故障恢复大为简化。若不要求严格 POSIX rename，可采用同款取舍。
 
 ### 2.2 InfiniFS: An Efficient Metadata Service for Large-Scale Distributed Filesystems（FAST 2022）
 
@@ -94,7 +94,7 @@ POSIX 语义要求逐级检查路径上每一级目录的存在性与权限。�
   - **存储引擎**：分片 KV 存储（论文实现基于内存 KV + RocksDB 持久化，细节待确认）。
 - **关键实验结果**：吞吐较 HopsFS 高 73×、较 CephFS 高 23×；目录树规模达 **1000 亿文件**仍保持稳定性能与近线性扩展。
 - **局限性**：推测解析依赖 ID 生成规则，rename/迁移后推测失败率上升；跨分片操作仍需分布式事务；客户端缓存失效协议增加复杂度。
-- **对 LightStore 的启示**：access/content 元数据解耦是 metaserver 表结构设计的高价值模式：LightStore 的 inode 表可拆为 `dentry(parent_id, name) -> {id, mode, uid...}` 与 `dir_content(id) -> ...` 两类 KV，分别按 parent_id 和自身 id 分区。可预测目录 ID + 客户端并行 lookup 能显著降低深路径 open 延迟。
+- **设计启示**：access/content 元数据解耦是元数据服务表结构设计的高价值模式：inode 表可拆为 `dentry(parent_id, name) -> {id, mode, uid...}` 与 `dir_content(id) -> ...` 两类 KV，分别按 parent_id 和自身 id 分区。可预测目录 ID + 客户端并行 lookup 能显著降低深路径 open 延迟。
 
 ### 2.3 CFS: Scaling Metadata Service for Distributed File System via Pruned Scope of Critical Sections（EuroSys 2023）
 
@@ -109,7 +109,7 @@ POSIX 语义要求逐级检查路径上每一级目录的存在性与权限。�
   - **存储引擎**：TafDB（百度自研分布式表格存储）+ FileStore。
 - **关键实验结果**：50 节点集群上，吞吐较 HopsFS 提升 **1.76–75.82×**，较 InfiniFS 提升 **1.22–4.10×**；平均延迟分别降低 91.71% 与 54.54%。生产目标规模为千亿级文件（百度沧海 CFS）。
 - **局限性**：复杂 rename 走独立慢路径服务；架构与特定表格系统（TafDB）深度耦合；跨层（TafDB/FileStore）一致性协议复杂。
-- **对 LightStore 的启示**：LightStore metaserver 的第一性原则应是"**让常见元数据操作落在单分片**"：通过布局（按目录聚合 + 属性与 dentry 分离）把 create/unlink/stat 变成单分片事务，只为 rename 保留昂贵路径。这比引入通用分布式事务框架代价小得多。
+- **设计启示**：元数据服务的第一性原则应是"**让常见元数据操作落在单分片**"：通过布局（按目录聚合 + 属性与 dentry 分离）把 create/unlink/stat 变成单分片事务，只为 rename 保留昂贵路径。这比引入通用分布式事务框架代价小得多。
 
 ### 2.4 SingularFS: A Billion-Scale Distributed File System Using a Single Metadata Server（USENIX ATC 2023）
 
@@ -124,7 +124,7 @@ POSIX 语义要求逐级检查路径上每一级目录的存在性与权限。�
   - **存储引擎**：NVMM（Intel Optane PM）上的自研内存结构，RDMA 网络。
 - **关键实验结果**：单 MDS 支撑 **10 亿级文件**；吞吐显著超过多节点部署的分布式 MDS 基线（具体倍数待确认，论文摘要称大幅优于现有系统）。
 - **局限性**：容量与吞吐终有单机上限；依赖 Optane PM（已停产，需以 CXL 内存/高速 NVMe 替代验证）；单点容错依赖主备复制。
-- **对 LightStore 的启示**：在 LightStore 的目标规模（若 ≤ 数十亿文件）内，"单个高性能 metaserver + 主备复制"可能比分布式元数据简单一个数量级。log-free + 层级并发控制的思想在 DRAM+NVMe 组合下同样适用：能用原子指令/单点顺序写解决的，不要用锁和 journal。
+- **设计启示**：若目标规模 ≤ 数十亿文件，"单个高性能元数据服务器 + 主备复制"可能比分布式元数据简单一个数量级。log-free + 层级并发控制的思想在 DRAM+NVMe 组合下同样适用：能用原子指令/单点顺序写解决的，不要用锁和 journal。
 
 ### 2.5 λFS: A Scalable and Elastic Distributed File System Metadata Service using Serverless Functions（ASPLOS 2023）
 
@@ -139,7 +139,7 @@ POSIX 语义要求逐级检查路径上每一级目录的存在性与权限。�
   - **存储引擎**：MySQL NDB Cluster（继承自 HopsFS）。
 - **关键实验结果**：在真实与合成负载下显著优于 HopsFS（尖峰负载下延迟与成本均优；具体倍数随负载而异，详见论文），弹性伸缩无需人工扩容。
 - **局限性**：serverless 平台冷启动与调用开销；依赖外部数据库的事务吞吐上限；工程栈（Java/OpenWhisk）与传统 C++ 存储栈差异大。
-- **对 LightStore 的启示**："元数据 = 无状态计算层 + 有状态存储层"的分层让弹性成为配置问题而非架构问题。LightStore 即使不用 FaaS，也可让 metaserver 进程无状态化（缓存 + 路由），把持久状态收敛到复制状态机/KV 层，从而支持 metaserver 快速增删。
+- **设计启示**："元数据 = 无状态计算层 + 有状态存储层"的分层让弹性成为配置问题而非架构问题。即使不用 FaaS，也可让元数据服务进程无状态化（缓存 + 路由），把持久状态收敛到复制状态机/KV 层，从而支持元数据节点快速增删。
 
 ### 2.6 FileScale: Fast and Elastic Metadata Management for Distributed File Systems（SoCC 2023）
 
@@ -153,7 +153,7 @@ POSIX 语义要求逐级检查路径上每一级目录的存在性与权限。�
   - **存储引擎**：shared-nothing 分布式数据库（基于确定性数据库技术，Abadi 团队 Calvin 谱系，具体实现待确认）。
 - **关键实验结果**：小规模下与单机 HDFS NameNode 性能相当；元数据规模增长时呈线性扩展。
 - **局限性**：三层缓存一致性协议复杂；写多负载下内存层收益下降；基于 Java/HDFS 生态。
-- **对 LightStore 的启示**：LightStore 大概率从小集群起步——"小规模不为扩展性交税"值得作为 metaserver 的显式设计目标：单 metaserver 内存快路径 + 可插拔的分布式持久层，规模化时平滑切换，而不是一开始就承担分布式事务开销。
+- **设计启示**：多数新系统从小集群起步——"小规模不为扩展性交税"值得作为元数据服务的显式设计目标：单节点内存快路径 + 可插拔的分布式持久层，规模化时平滑切换，而不是一开始就承担分布式事务开销。
 
 ### 2.7 Mantle: Efficient Hierarchical Metadata Management for Cloud Object Storage Services（SOSP 2025）
 
@@ -168,7 +168,7 @@ POSIX 语义要求逐级检查路径上每一级目录的存在性与权限。�
   - **存储引擎**：TafDB（与 CFS 同源的百度分布式表格系统）。
 - **关键实验结果**：单 namespace 支撑 **100 亿对象/目录**；lookup 达 **180 万 ops/s**；高争用下 5.8 万目录更新/s；相比 Tectonic/InfiniFS/LocoFS 的元数据服务，延迟降低 6.6%–99.1%，吞吐提升 0.07–115×；在百度 BOS 生产环境部署超过 2 年。
 - **局限性**：IndexNode 是每 namespace 的集中组件（容量与故障域受限，靠"只存 80B/目录"缓解）；两层间一致性维护复杂。
-- **对 LightStore 的启示**："**大而全的分片存储 + 小而热的集中索引**"是极实用的混合架构：LightStore 可让 manager 或一个轻量 index 组件仅缓存目录骨架（id、parent、name、权限），承担路径解析与 rename 防环，metaserver 分片只处理平坦化的 inode/dentry 读写。目录骨架极小（百亿目录 ≈ 数百 GB，亿级目录 ≈ 数 GB），单机可承载。
+- **设计启示**："**大而全的分片存储 + 小而热的集中索引**"是极实用的混合架构：可让一个轻量 index 组件仅缓存目录骨架（id、parent、name、权限），承担路径解析与 rename 防环，元数据分片只处理平坦化的 inode/dentry 读写。目录骨架极小（百亿目录 ≈ 数百 GB，亿级目录 ≈ 数 GB），单机可承载。
 
 ### 2.8 HMFS: Accelerating Distributed Filesystem Metadata Service via Decoupling Directory Semantics from Metadata Indexing（SoCC 2025）
 
@@ -182,7 +182,7 @@ POSIX 语义要求逐级检查路径上每一级目录的存在性与权限。�
   - **parallel directory listing**：沿链接并行遍历，加速大目录 readdir。
 - **关键实验结果**：显著超越基于有序索引的元数据服务（具体倍数待确认，需查论文正文）。
 - **局限性**：链接结构使范围/前缀查询之外的语义（如按序分页 readdir）需要额外设计；PM 依赖同 SingularFS。
-- **对 LightStore 的启示**：metaserver 存储引擎选型不必默认 RocksDB/LSM："readdir 需要有序性"这一假设可以被打破——hash 索引 + 目录内链表（或分桶）既降低写放大又保留遍历能力。若 LightStore 用 RocksDB，至少应把"目录扫描"与"点查"分开建模，避免为点查负载支付排序成本。
+- **设计启示**：元数据存储引擎选型不必默认 RocksDB/LSM："readdir 需要有序性"这一假设可以被打破——hash 索引 + 目录内链表（或分桶）既降低写放大又保留遍历能力。若使用 RocksDB，至少应把"目录扫描"与"点查"分开建模，避免为点查负载支付排序成本。
 
 ### 2.9 FalconFS: Distributed File System for Large-Scale Deep Learning Pipeline（NSDI 2026）
 
@@ -198,7 +198,7 @@ POSIX 语义要求逐级检查路径上每一级目录的存在性与权限。�
   - **存储引擎**：MNode = 定制扩展的 **PostgreSQL**（复用其表/事务/B-link 树/WAL/主备复制）。
 - **关键实验结果**：对比 CephFS/Lustre，小文件读写吞吐最高 **5.72×**，模型训练吞吐最高 **12.81×**；在华为自动驾驶生产环境（**10,000 NPU**）稳定运行一年。
 - **局限性**：面向"目录数远小于文件数"的 AI 负载假设；namespace 复制在目录频繁变更的通用负载下失效开销大；rename 语义细节待确认。
-- **对 LightStore 的启示**：若 LightStore 的目标场景含 AI 训练（海量小文件、超多客户端），"服务端解析 + 目录树全复制 + 文件按名 hash"是经生产验证的组合；且"用成熟单机数据库（PostgreSQL/RocksDB）当分片引擎"能省去自研存储引擎的大量工程量。
+- **设计启示**：若目标场景含 AI 训练（海量小文件、超多客户端），"服务端解析 + 目录树全复制 + 文件按名 hash"是经生产验证的组合；且"用成熟单机数据库（PostgreSQL/RocksDB）当分片引擎"能省去自研存储引擎的大量工程量。
 
 ### 2.10 MesaFS: An I/O-Efficient Metadata Service for Distributed File Systems（EuroSys 2026）
 
@@ -211,7 +211,7 @@ POSIX 语义要求逐级检查路径上每一级目录的存在性与权限。�
   - **semi-ordered metadata layout**：半有序布局，避免为维护全序而产生的搬移/合并写放大。
 - **关键实验结果**：达到裸 SSD 性能的 **62.0%–95.1%**（对比：按 InfiniFS 方案模拟仅 8.4%–37.2%）。
 - **局限性**：崩溃恢复逻辑更复杂（需修复不变式）；面向 SSD 单机引擎层，不解决分区/rename 等分布式问题。
-- **对 LightStore 的启示**：metaserver 落盘路径的写放大值得量化：如果 LightStore 用 RocksDB，一次 create 实际写了 WAL + memtable flush + compaction 多份。可借鉴"以不变式而非全量原子性为目标"的思路设计精简 journal，或按 MesaFS 方式定制半有序布局。
+- **设计启示**：元数据落盘路径的写放大值得量化：如果使用 RocksDB，一次 create 实际写了 WAL + memtable flush + compaction 多份。可借鉴"以不变式而非全量原子性为目标"的思路设计精简 journal，或按 MesaFS 方式定制半有序布局。
 
 ### 2.11 SwitchFS: Asynchronous Metadata Updates for Distributed Filesystems with In-Network Coordination（EuroSys 2026）
 
@@ -224,7 +224,7 @@ POSIX 语义要求逐级检查路径上每一级目录的存在性与权限。�
   - **可编程交换机协调**：用 programmable switch 的片上资源跟踪目录状态（哪些目录有未应用的 delta），以近乎零开销做全局协调。
 - **关键实验结果**：显著降低目录争用下的延迟并提升吞吐（具体数字待确认，需查论文正文）。
 - **局限性**：依赖 P4 可编程交换机硬件；交换机资源极有限，状态管理复杂；部署门槛高。
-- **对 LightStore 的启示**：硬件不必照搬，但"**目录统计/时间戳等派生元数据延迟到读时物化**"的思想可直接用于 LightStore：create/unlink 只写 delta 记录，`stat`/`readdir` 时合并——把写热点转化为读时少量额外工作。
+- **设计启示**：硬件不必照搬，但"**目录统计/时间戳等派生元数据延迟到读时物化**"的思想可直接借鉴：create/unlink 只写 delta 记录，`stat`/`readdir` 时合并——把写热点转化为读时少量额外工作。
 
 ---
 
@@ -233,7 +233,7 @@ POSIX 语义要求逐级检查路径上每一级目录的存在性与权限。�
 - **Metis（FAST 2024）**：核实结果为 *Metis: File System Model Checking via Versatile Input and State Exploration*（Stony Brook 等），是**文件系统模型检测/测试**工作，与元数据扩展性无关。任务候选中的"Metis / 元数据 KV 化"应指别的工作——2020 年后未检索到以 Metis 命名的元数据 KV 化论文（待确认）；元数据 KV 化的代表性谱系是 2020 年前的 TableFS/IndexFS/LocoFS，此处不展开。
 - **TafDB**：并非独立论文，而是百度自研分布式表格系统，作为 CFS（EuroSys 2023）与 Mantle（SOSP 2025）的 namespace 存储层出现，已在上文两节覆盖。
 - **DPFS: DPU-Powered File System Virtualization（SYSTOR 2023，IBM Research 等）**：将 virtio-fs/NFS 客户端 offload 到 DPU 的文件系统虚拟化工作，主要贡献在数据面与客户端卸载，元数据扩展性不是其核心主题，故不单列（venue 与定位已核实）。
-- **3FS（DeepSeek，2025 开源）**：工业系统而非同行评审论文——元数据服务无状态、持久化于 FoundationDB（事务 KV），链式复制 CRAQ 做数据面。与 Tectonic/λFS 同属"元数据下沉到事务 KV"路线，可与本仓库已有的 3FS 调研文档互参（待确认文档路径）。
+- **3FS（DeepSeek，2025 开源）**：工业系统而非同行评审论文——元数据服务无状态、持久化于 FoundationDB（事务 KV），链式复制 CRAQ 做数据面。与 Tectonic/λFS 同属"元数据下沉到事务 KV"路线，可与 [industry-production-systems.md](industry-production-systems.md) 中的 3FS 小节互参。
 - **Fletch / FMCache: File-System Metadata Caching in Programmable Switches（arXiv 2510.08351，2025）**：网内元数据缓存，处理路径依赖的在交换机内缓存失效问题；截至调研日未确认正式会议收录（待确认）。
 - **Xfast: Extreme File Attribute Stat Acceleration for Lustre（SC 2023）**：面向 Lustre 的 stat 加速，HPC 场景元数据读优化（https://dl.acm.org/doi/10.1145/3581784.3607080）。
 - **SwitchDelta（arXiv 2511.19978）**：SwitchFS 同一路线的后续/关联工作，网内数据可见性驱动的异步元数据更新（待确认 venue）。
@@ -258,18 +258,18 @@ POSIX 语义要求逐级检查路径上每一级目录的存在性与权限。�
 
 ---
 
-## 5. 对 LightStore metaserver 的总体启示
+## 5. 元数据服务设计的总体启示
 
-结合 LightStore 现有 manager / metaserver / dataserver 三组件架构（C++），归纳为六条原则与一个演进路径。
+面向新的分布式文件系统元数据服务设计，归纳为六条原则与一个演进路径。
 
 ### 5.1 设计原则
 
-1. **规模先行判断**：若目标 ≤ 数十亿文件，SingularFS/Mantle-IndexNode 路线表明"单个强 metaserver（或集中目录骨架）+ 分片平坦数据"就足够，不要过早引入分布式事务。
+1. **规模先行判断**：若目标 ≤ 数十亿文件，SingularFS/Mantle-IndexNode 路线表明"单个强元数据服务器（或集中目录骨架）+ 分片平坦数据"就足够，不要过早引入分布式事务。
 2. **解耦是共识**：dentry（解析用）与 inode 属性（stat 用）分表、分区键分别取 parent_id 与 self_id，是 InfiniFS/CFS/Mantle 反复验证的模式。
 3. **rename 单独设计**：常见操作单分片化（CFS），rename 走集中防环组件（Mantle）或独立服务；不要让 1% 的 rename 决定 99% 操作的架构。
 4. **热点用 delta 化解**：目录时间戳/统计等派生元数据延迟物化（SwitchFS、Mantle），create 风暴下不更新父目录本体。
 5. **存储引擎务实选型**：事务 KV（RocksDB/ZippyDB 路线）或嵌入成熟数据库（FalconFS 的 PostgreSQL）皆可；同时量化落盘写放大（MesaFS 视角），必要时定制精简 journal。
-6. **弹性靠无状态化**：metaserver 进程无状态 + 状态收敛到复制存储层（λFS/Tectonic/3FS），扩缩容即改路由。
+6. **弹性靠无状态化**：元数据服务进程无状态 + 状态收敛到复制存储层（λFS/Tectonic/3FS），扩缩容即改路由。
 
 ### 5.2 建议的表结构（借鉴 InfiniFS/CFS/Tectonic 分层）
 
@@ -277,17 +277,17 @@ POSIX 语义要求逐级检查路径上每一级目录的存在性与权限。�
 dentry 表：  key = (parent_inode_id, name)      -> {inode_id, type}         # 按 parent_id 分区
 inode 表：   key = inode_id                     -> {mode, uid, gid, times…} # 按 inode_id 分区
 dir_stat 表：key = inode_id                     -> {entry_count_delta…}     # delta 记录，读时合并
-extent 表：  key = (inode_id, block_index)      -> {dataserver 位置…}       # 按 inode_id 分区
+extent 表：  key = (inode_id, block_index)      -> {数据块位置…}          # 按 inode_id 分区
 ```
 
 - 同目录 create/unlink/readdir 落在 dentry 表单分片；stat 点查 inode 表单分片；
-- 跨目录 rename 涉及两个 dentry 分片 + 防环检查，由 manager（或独立 rename 路径）集中裁决（Mantle 模式）；
+- 跨目录 rename 涉及两个 dentry 分片 + 防环检查，由集中式索引组件（或独立 rename 路径）裁决（Mantle 模式）；
 - 目录 mtime/nlink 等写入 dir_stat delta，`stat`/`readdir` 时合并物化（SwitchFS 模式）。
 
 ### 5.3 演进路径
 
-- **阶段一（单 metaserver）**：内存目录树 + RocksDB 持久化，实现 SingularFS 式层级并发控制；manager 只管租约、心跳与故障切换（主备）。
-- **阶段二（目录骨架集中 + inode 分片）**：目录骨架（约百字节/目录）留在主 metaserver 或 manager 内存中做单 RPC 路径解析与 rename 防环；inode/dentry 数据按上表 hash 分片到多个 metaserver（Mantle 模式）。
+- **阶段一（单元数据服务器）**：内存目录树 + RocksDB 持久化，实现 SingularFS 式层级并发控制；控制面只管租约、心跳与故障切换（主备）。
+- **阶段二（目录骨架集中 + inode 分片）**：目录骨架（约百字节/目录）留在主元数据服务器或集中索引组件内存中做单 RPC 路径解析与 rename 防环；inode/dentry 数据按上表 hash 分片到多个元数据节点（Mantle 模式）。
 - **阶段三（可选，全分布式）**：仅当目录骨架本身超出单机（约对应 >10^10 目录）时，才考虑 InfiniFS 式推测解析 + 客户端乐观缓存，或将骨架也分片。
 
 多数论文的经验表明：阶段二足以覆盖百亿文件规模，阶段三在生产中极少真正需要。

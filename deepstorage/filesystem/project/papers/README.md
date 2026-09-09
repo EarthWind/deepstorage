@@ -4,14 +4,14 @@
 >
 > 范围：2020 年（含）之后发表的分布式文件系统及紧密相关领域的论文，以 FAST / OSDI / SOSP / ATC / EuroSys / NSDI / ASPLOS / SC / SoCC 等系统方向会议为主，辅以少量经核实的期刊、workshop 与工业界技术报告（非同行评审材料在文中均明确标注）。
 >
-> 视角：为 LightStore（manager/metaserver/dataserver 架构的自研 C++ 分布式文件系统）的设计与演进提供论文层面的参照。每篇论文均记录出处链接与"对 LightStore 的启示"。
+> 视角：面向分布式文件系统的设计者与研究者，为新系统的设计与既有系统的演进提供论文层面的参照。每篇论文均记录出处链接与"设计启示"（面向通用分布式文件系统设计的可借鉴经验）。
 
 ## 1. 文档导航
 
 按主题分为五个方向，每个方向一份文档：
 
 1. [工业界大规模生产系统](industry-production-systems.md)：Meta Tectonic / Tectonic-Shift、Alibaba Pangu / Fisc、Baidu CFS、DeepSeek Fire-Flyer 与 3FS、Huawei FalconFS、Google Colossus（博客）与 CacheSack 等。看"真实生产规模下什么设计能活下来"。
-2. [元数据扩展性](metadata-scalability.md)：InfiniFS、CFS、SingularFS、λFS、FileScale、Mantle、HMFS、FalconFS、MesaFS、SwitchFS 等。聚焦 namespace 分区、路径解析、rename 原子性、热点与弹性扩容，是 metaserver 设计最直接的参照。
+2. [元数据扩展性](metadata-scalability.md)：InfiniFS、CFS、SingularFS、λFS、FileScale、Mantle、HMFS、FalconFS、MesaFS、SwitchFS 等。聚焦 namespace 分区、路径解析、rename 原子性、热点与弹性扩容，是元数据服务设计最直接的参照。
 3. [新硬件方向](new-hardware.md)：Assise、Octopus+、LineFS、DPFS、DAOS、Famfs、3FS 等。覆盖 persistent memory（含 Optane 停产后的格局）、RDMA、SmartNIC/DPU 卸载与 CXL。
 4. [HPC 与 AI 训练存储](hpc-ai-storage.md)：HadaFS、DeltaFS、UnifyFS、GekkoFS、CHFS 等 burst buffer / 超算文件系统，Quiver、SHADE、SiloD 等训练缓存，以及 CheckFreq、Gemini、ByteCheckpoint 等 checkpoint 存储工作。
 5. [客户端与通用技术](client-and-general-techniques.md)：FUSE 优化（XFUSE、RFUSE、FUSE-over-io_uring）、缓存一致性（DFUSE、Concordia）、纠删码（ECWide、wide LRC、Tiger、RepairBoost、ParaRC）、可靠性实证与 crash consistency（Perseus、EBS 演进、Metis 等）。
@@ -116,8 +116,8 @@
 
 ## 4. 阅读建议
 
-- **设计 metaserver / namespace**：先读[元数据扩展性](metadata-scalability.md)全篇，再对照[工业界生产系统](industry-production-systems.md)中 Tectonic 与 FalconFS 的取舍。
-- **设计 dataserver / 数据路径**：读[工业界生产系统](industry-production-systems.md)中 Pangu、Fisc，[新硬件](new-hardware.md)的 RDMA/用户态栈部分，以及[客户端与通用技术](client-and-general-techniques.md)的纠删码章节。
+- **设计元数据服务 / namespace**：先读[元数据扩展性](metadata-scalability.md)全篇，再对照[工业界生产系统](industry-production-systems.md)中 Tectonic 与 FalconFS 的取舍。
+- **设计数据路径 / 存储节点**：读[工业界生产系统](industry-production-systems.md)中 Pangu、Fisc，[新硬件](new-hardware.md)的 RDMA/用户态栈部分，以及[客户端与通用技术](client-and-general-techniques.md)的纠删码章节。
 - **面向 AI 训练负载选型/优化**：读[HPC 与 AI 训练存储](hpc-ai-storage.md)的负载特征综述与 3FS/FalconFS/Tectonic-Shift 相关小节。
 - **设计客户端（FUSE vs SDK）**：读[客户端与通用技术](client-and-general-techniques.md)第 1-2 章，对照 Fisc 的轻量客户端路线。
 - **评估可靠性工程**：读[客户端与通用技术](client-and-general-techniques.md)第 4 章（Perseus、故障注入研究、Metis）。

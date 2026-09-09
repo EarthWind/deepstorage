@@ -44,7 +44,7 @@ func EncodeVuid(v VuidPrefix, epoch uint32) Vuid
 - **`epoch` 是 fencing 版本**——每次这个位被迁移/修复到新磁盘，epoch 递增
 
 旧 epoch 的写入会被拒绝，避免"修复完成后旧节点又写进来"的脑裂。
-**这与 LightStore 的 `vol_epoch` 是同一机制**，设计文档里已有，此处是一个成熟实现的印证。
+这是分布式存储中标准的 **epoch fencing** 机制的一个成熟实现。
 
 ### 2.2 Shard 支持 inline
 
@@ -69,7 +69,7 @@ type Shard struct {
   读取时一次 IO 拿到（`blobstore/blobnode/core/shard.go:207`）
 - **`NopData`**：全零数据只记标志位，不落盘
 
-LightStore 的 record 头部可以考虑同样的 `NopData` 标志——稀疏文件和
+任何自定义的记录格式都可以在头部加同样的 `NopData` 标志——稀疏文件和
 预分配场景下能省下可观空间，实现成本几乎为零。
 
 ## 3. EC 编码策略（CodeMode）
@@ -99,7 +99,7 @@ type Tactic struct {
 | EC16P4 | 16+4 | 1 | 19 | 1.25x | 单 AZ |
 | EC10P4 | 10+4 | 1 | 13 | 1.4x | 单 AZ |
 
-**EC12P4 = 1.33x，正是 LightStore 设计文档选定的 RS(12,4)。** 参数选择被独立印证。
+**EC12P4 即 RS(12,4)，1.33x**，是单 AZ 部署下容错与成本之间常见的折中点。
 
 `PutQuorum` 的约束写在注释里：
 
@@ -109,13 +109,13 @@ type Tactic struct {
 ```
 
 这条不等式很有用：它保证了即使一个 AZ 全挂，已确认的写入仍然可恢复。
-**LightStore 做多 AZ EC 时应该照搬这条约束**。
+**任何做多 AZ EC 的系统都应按这条约束推导 quorum 下界**。
 
 `MinShardSize = 2 KiB`：数据不足 `N × 2KiB` 时补零对齐。
 所以 EC 模式对小对象有固定的空间浪费下限——EC12P4 下，
 一个 1KB 的对象也要占 12×2KiB = 24KiB 的数据分片空间。
 **这就是为什么 CubeFS 把小文件放多副本栈的 tiny extent，而不是 EC 栈。**
-LightStore 的"小文件打包 + 大文件/冷数据 EC"分工是对的。
+"小文件打包进副本栈 + 大文件/冷数据走 EC"的分工是通用的合理选择。
 
 ## 4. 写路径：quorum，与 DataNode 相反
 
@@ -145,10 +145,10 @@ LightStore 的"小文件打包 + 大文件/冷数据 EC"分工是对的。
 **这是一条重要的设计规律**：副本数少时 write-all 简单且延迟可接受；
 分片数多时必须走 quorum，否则尾延迟被 N+M 个节点里最慢的那个绑架。
 
-LightStore 的 EC RS(12,4) 是 16 个分片——**如果照搬"等待全部"的副本逻辑，
-尾延迟会很难看**。设计文档里 EC 部分写的是"条带化追加"，
-建议明确写入确认策略：EC 路径应该用 quorum（≥ 13，按上面的不等式），
-而不是复用副本路径的密封长度对齐。
+以 RS(12,4) 为例就是 16 个分片——**如果照搬"等待全部"的副本逻辑，
+尾延迟会很难看**。设计 EC 写路径时应明确写入确认策略：
+用 quorum 确认（下界按上面的不等式和自身的故障域模型推导），
+剩余分片后台补齐，而不是复用副本路径的"等待全部"。
 
 ## 5. Location：对象寻址
 
@@ -177,9 +177,9 @@ type Slice struct {
 这是很好的元数据压缩手法：一个 1TB 的对象，按 8MB 一个 blob 是 131072 个 blob，
 但如果它们连续落在少数几个卷上，`Slices` 数组只有几条记录。
 
-**对 LightStore 的启示**：extent 索引 `(inode_id, file_offset) → Loc` 是逐条记录的。
-如果一次大写入产生的多条 record 在同一个 volume 内连续，
-可以考虑同样的游程压缩：`(volume_id, start_offset, record_count, record_size)`。
+**设计启示**：文件系统的 extent 索引通常是 `(inode, file_offset) → 位置` 逐条记录的。
+如果一次大写入产生的多条记录在同一个数据容器内连续，
+可以考虑同样的游程压缩：`(container_id, start_offset, record_count, record_size)`。
 对大文件顺序写场景，元数据条数能降一到两个数量级。
 
 ## 6. 后台任务：Scheduler
@@ -196,11 +196,10 @@ type Slice struct {
 | `manual_migrater.go` | 手动迁移 |
 | `migrate.go` | 迁移任务的公共框架 |
 
-**全部是服务端驱动的，不依赖客户端在线**——与 JuiceFS 形成鲜明对比，
-与 LightStore 的设计原则第 4 条一致。
+**全部是服务端驱动的，不依赖客户端在线**——与 JuiceFS 形成鲜明对比。
 
 `blob_deleter` 走消息队列消费删除请求，这样删除是异步、可重试、可限流的。
-LightStore 的"GC 由删除日志订阅驱动"是同一思路。
+"GC 由删除日志/删除消息订阅驱动"是值得沿用的思路。
 
 ### BlobNode 的本地 compact
 
@@ -214,9 +213,9 @@ LightStore 的"GC 由删除日志订阅驱动"是同一思路。
 - 索引在外部、offset 必须稳定 → 只能 compact
 - 索引可容忍空洞、读到零即可 → 可以打洞
 
-LightStore 的 Loc 含 `offset`，是"索引在外部、offset 必须稳定"的形态，
-所以**卷内 compaction 无法完全被打洞替代**——打洞只能回收空间，
-不能改变存活 record 的地址。这一点在 [分析文档](cubefs-analysis.md) §2.2 展开。
+凡是寻址结构里直接含卷内 `offset` 的设计，都属于"索引在外部、offset 必须稳定"的形态，
+此时**卷内 compaction 无法完全被打洞替代**——打洞只能回收空间，
+不能改变存活记录的地址。这一点在 [分析文档](cubefs-analysis.md) §2.2 展开。
 
 ---
 

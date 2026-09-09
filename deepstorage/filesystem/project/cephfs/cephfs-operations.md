@@ -256,7 +256,7 @@ logical namespace bytes
 ## 12. 推荐后续工作
 
 1. 在 6–12 节点 PoC 集群按 [技术评估](cephfs-analysis.md) 的矩阵建立基线。
-2. 用 LightStore 目标对象大小/目录分布生成器对比 CephFS replicated、EC 与 LightStore packing。
+2. 用目标业务的对象大小/目录分布生成器对比 CephFS replicated 与 EC 的物理成本，必要时与候选的打包式小文件存储横向对比。
 3. 对 1/2/4 active MDS 做相同 workload scaling efficiency，记录 subtree/dirfrag 实际分布。
 4. 定义业务 durability contract，并验证 write/close/fsync/rename/snapshot 的断电结果。
 5. 形成 MDS failover、client eviction、lost PG、metadata damage 和 mirror promotion 五份 runbook。

@@ -403,13 +403,13 @@ management host 故障：RTO <= Y min，DB transaction RPO = 0（外部同步存
 - 恢复一个 metadata store/service 和一个 storage target；
 - 全文件系统从备份/RST 重建并用 fsck+manifest 校验。
 
-## 15. 对 LightStore 的启示
+## 15. 设计启示
 
 1. 借鉴 `reachability × consistency` 二维状态，不把离线、落后、修复中、坏副本混成一个枚举。
-2. LightStore Manager 已使用 Raft，应让 node/volume/placement epoch 进入一致日志，避免 BeeGFS management 外部 HA 的正确性负担。
+2. 控制面若内建 Raft 等共识协议，应让 node/volume/placement epoch 进入一致日志，避免 BeeGFS management 外部 HA 的正确性负担。
 3. 副本/EC repair 必须携带 source generation、commit index/checksum，防止“旧副本成为新 primary 后反向覆盖”。
 4. 降级写策略应显式暴露当前 durability level，且在第二故障前阻止危险运维。
-5. Storage selective repair 可借鉴“最后成功通信时间 + safety window”，但 LightStore volume/record 还应使用 mutation index/extent map，
+5. Storage selective repair 可借鉴“最后成功通信时间 + safety window”，但采用自定义数据布局的系统还应使用 mutation index/extent map，
    不只依赖 mtime。
-6. 保留独立 fsck/reconciler：Raft 保证单组日志一致，不自动保证跨 Meta Range、Location、Data volume、EC shards 的引用闭环。
+6. 保留独立 fsck/reconciler：共识协议保证单组日志一致，不自动保证跨元数据分片、数据位置、data volume、EC shards 的引用闭环。
 7. Backup 必须从第一天定义全局 checkpoint/manifest，而不是等规模上来后再用逐节点文件复制拼接。

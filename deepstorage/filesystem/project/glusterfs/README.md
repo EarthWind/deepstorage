@@ -4,7 +4,7 @@
 >
 > 实现基线：GlusterFS `v11.2`（commit `15d3c0f8435814fdb7242a8a82fa5db140013d0a`，2025-07-02）
 >
-> 视角：分布式文件系统架构、无中心元数据、客户端复制/EC、一致性与脑裂、故障恢复、生产运维及 LightStore 设计对照
+> 视角：分布式文件系统架构、无中心元数据、客户端复制/EC、一致性与脑裂、故障恢复、生产运维及通用设计启示
 
 ## 1. 技术摘要
 
@@ -46,7 +46,7 @@ GlusterFS 是一个以 **无独立元数据服务器、客户端 translator 图�
 6. [高可用、恢复与灾备](glusterfs-ha-recovery.md)：故障矩阵、self-heal、brick replacement、bitrot、snapshot 和 geo-replication。
 7. [生产运维与安全](glusterfs-operations-security.md)：部署、容量、扩缩容、升级、监控、TLS、权限与 runbook。
 8. [性能模型与压测方法](glusterfs-performance.md)：metadata/data 放大、热点、调优边界和可复现 PoC 矩阵。
-9. [技术评估与 LightStore 对照](glusterfs-analysis.md)：结构性优缺点、可借鉴机制、不可照搬部分和选型建议。
+9. [技术评估与设计启示](glusterfs-analysis.md)：结构性优缺点、可借鉴机制、不可照搬部分、通用设计启示和选型建议。
 
 ## 4. 阅读建议
 
@@ -59,4 +59,4 @@ GlusterFS 是一个以 **无独立元数据服务器、客户端 translator 图�
 
 GlusterFS 的最佳适配场景，是已有 Gluster 运维能力、需要普通 Linux 文件可见性、容量以中大文件为主、可接受 FUSE 客户端和同步复制写延迟、故障域/仲裁部署清晰的存量环境。它也可作为“无中心元数据 + 客户端可组合数据面”的优秀研究对象。
 
-它不适合作为 2026 年新建超大规模、多租户、强安全边界或极低 metadata P99 系统的默认选择；也不适合把 replica 2、默认安全设置或异步 geo-rep 当成低成本 HA/DR。对于 LightStore 的 `10^12–10^13` 小文件、append-only volume packing、Range Raft 和 SDK-first 目标，GlusterFS 更适合作为机制对照而不是实现模板。
+它不适合作为 2026 年新建超大规模、多租户、强安全边界或极低 metadata P99 系统的默认选择；也不适合把 replica 2、默认安全设置或异步 geo-rep 当成低成本 HA/DR。对于以海量小文件和超大规模容量为目标的新系统设计，GlusterFS 更适合作为机制对照而不是实现模板。

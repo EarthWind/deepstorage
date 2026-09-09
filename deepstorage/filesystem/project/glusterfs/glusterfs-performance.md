@@ -113,7 +113,7 @@ create workloads 可按 basename hash 分到 sets；但：
 - 每文件仍产生 inode/xattr/GFID handle；
 - client thread/event/RPC connections 也可能先成为瓶颈。
 
-“无中心 MDS”避免一个 MDS CPU 上限，却没有提供自动分裂的 directory metadata shard。一个热目录不能像 LightStore Range 一样按 key range 由多个 Raft leaders 独立 authority。
+“无中心 MDS”避免一个 MDS CPU 上限，却没有提供自动分裂的 directory metadata shard。一个热目录无法像按 key range 分片的元数据服务那样，被拆分到多个独立 authority（例如多个共识 leader）上。
 
 ## 4. Workload 分析
 
@@ -165,7 +165,7 @@ Sharding 常用于此类 workload，但必须把 snapshot、heal、rebalance、t
 - heal source 较明确；
 - 可以按文件 hash 分散。
 
-但若每条记录一个小文件，inode/metadata 成本仍在；LightStore volume packing 在这一点有结构性优势。
+但若每条记录一个小文件，inode/metadata 成本仍在；把许多小记录打包到大顺序 volume 的设计（Haystack 式）在这一点有结构性优势。
 
 ### 4.5 Rename/Create storm
 

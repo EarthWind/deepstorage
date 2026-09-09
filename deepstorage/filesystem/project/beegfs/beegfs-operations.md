@@ -461,4 +461,4 @@ DKMS/autobuild 失败可能在计算节点重启后才暴露。应维护已批�
 2. 从真实数据采样文件大小、目录宽度、并发、lock/append/mmap/fsync 行为，生成四类 workload。
 3. 完成健康、降级、resync、满容量、慢 target、management failover 全矩阵测试。
 4. 输出每类目录的 pattern/cache/backup policy 和可接受 RPO/RTO。
-5. 用同一 workload 与 LightStore/CubeFS/Lustre/对象存储方案对照 TCO、p99、恢复复杂度，而非只比较峰值 GB/s。
+5. 用同一 workload 与 CubeFS/Lustre/对象存储方案对照 TCO、p99、恢复复杂度，而非只比较峰值 GB/s。

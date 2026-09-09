@@ -155,18 +155,18 @@ CephFS snapshot 创建很快，因为客户端脏数据可在 snapshot 创建后
 5. 监控 cap recall 和 slow clients，把 eviction/data-loss policy 写进业务 SLO。
 6. 对 snapshot 前的应用一致性实施 quiesce，而不是只调用 `mkdir .snap`。
 
-## 13. 对 LightStore 的启示
+## 13. 设计启示
 
-### 值得吸收
+### 可借鉴的机制
 
 - writer/read lease 应包含 owner、generation、expiry、placement epoch 和可撤销状态。
-- lease 失效必须与 DataServer fencing 联动；仅在 MetaServer 删 lease 不够。
-- 新 owner 获权前必须确认所有 DataServers 跨过 block/fence epoch，类似 OSDMap barrier。
+- lease 失效必须与数据节点侧 fencing 联动；仅在元数据服务删除 lease 不够。
+- 新 owner 获权前必须确认所有数据节点跨过 block/fence epoch，类似 OSDMap barrier。
 - ACK 明确区分 accepted、replica/EC durable、metadata committed，不让应用猜测。
 - 客户端 retry 使用 operation ID，服务端保存有界 dedup/replay 状态。
 
-### 不应照搬
+### 应规避的设计
 
-- LightStore 非完整 POSIX，不必实现每 inode 多维 caps/lock state；优先少数清晰 API：immutable put、single-writer append、CAS metadata、atomic publish。
+- 若新系统不以完整 POSIX 为目标，不必实现每 inode 多维 caps/lock state；优先少数清晰 API：immutable put、single-writer append、CAS metadata、atomic publish。
 - 不暴露无法跨客户端正确实现的 `flock`/shared `mmap`；明确 `ENOTSUP` 比弱语义更安全。
-- 避免把海量客户端的细粒度缓存状态全部 pin 在 MetaServer 内存；可使用短租约、versioned read cache 和服务端无状态 token 降低恢复状态量。
+- 避免把海量客户端的细粒度缓存状态全部 pin 在元数据服务内存；可使用短租约、versioned read cache 和服务端无状态 token 降低恢复状态量。

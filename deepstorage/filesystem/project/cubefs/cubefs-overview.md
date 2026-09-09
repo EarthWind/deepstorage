@@ -70,7 +70,7 @@ Volume（卷，用户可见的文件系统实例）
 一个 DP 就是若干台 DataNode 上各一份的副本组（默认 3 副本），
 由 Master 在创建卷时批量预分配、并随容量增长动态补充。
 
-DP 是**放置、复制与修复的单元**——与 LightStore 的 Volume 概念完全对应。
+DP 是**放置、复制与修复的单元**。
 Master 只维护 O(DP 数) 的状态，不感知单个文件。
 
 ### 3.2 Meta Partition
@@ -134,12 +134,12 @@ type ExtentKey struct {
 }
 ```
 
-**这与 LightStore 的 `Loc = {volume_id, offset, length, cookie}` 高度同构**：
-`PartitionId` ≈ `volume_id`，`ExtentId + ExtentOffset` ≈ `offset`，`Size` ≈ `length`。
-差别是 CubeFS 多一层 extent 间接（分区内还要定位到具体 extent 文件），
-而 LightStore 直接用卷内偏移——少一层，但要求卷内布局完全由偏移决定。
+这是典型的 `(数据容器, 容器内位置, 长度)` 三元组寻址：`PartitionId` 定位数据容器，
+`ExtentId + ExtentOffset` 定位容器内位置，`Size` 是长度。
+与"卷 ID + 卷内偏移"的扁平寻址相比，CubeFS 多一层 extent 间接（分区内还要定位到具体 extent 文件）；
+扁平寻址少一层查找，但要求卷内布局完全由偏移决定。
 
-CubeFS 用 `CRC` 做端到端校验，没有 LightStore 的 `cookie`（防越权构造）机制。
+CubeFS 用 `CRC` 做端到端校验，ExtentKey 中没有防越权构造的 cookie 一类字段。
 
 ## 6. 接入方式
 
@@ -163,7 +163,7 @@ CubeFS 用 `CRC` 做端到端校验，没有 LightStore 的 `cookie`（防越权
 | 复制 | 由对象存储负责 | 自己实现：主副本转发 + 等待全部副本 |
 | 后台任务 | 客户端抢租约 | Master / DataNode 驱动 |
 
-后三行是 CubeFS 与 LightStore 真正可以逐条对照的部分。
+后三行（覆盖写、小文件、复制）是自研全栈路线必须自己回答的问题，也是后续几篇的重点。
 
 ---
 

@@ -276,7 +276,7 @@ truncate 需要对 stripe targets 计算新的本地末尾并并行调整，多 
 
 ## 10. 小文件行为
 
-BeeGFS 没有把用户小文件内容内联到 metadata，也没有把大量小文件打包进 append-only volume。空文件只需要 metadata；
+BeeGFS 没有把用户小文件内容内联到 metadata，也没有把大量小文件打包进共享的大文件（Haystack 式 packing）。空文件只需要 metadata；
 一旦写入，小文件至少在一个 storage target 创建一个 chunk inode，并产生 metadata RPC、storage create/open/write/close 和底层 journal I/O。
 
 对平均几 KiB 的海量小文件，放大主要来自：
@@ -352,22 +352,22 @@ RST 适合归档/共享副本/容量卸载，但不能被表述为“透明对�
 
 只跑 IOR 峰值不能证明小文件、fsync、降级、重平衡和恢复期 SLA。
 
-## 14. 对 LightStore 的启示
+## 14. 设计启示
 
-### 可借鉴
+### 可借鉴的机制
 
 - 布局携带于 metadata，SDK 纯计算 `offset -> target`，避免数据路径中心索引；
-- 按 stripe set 并发且控制每 target in-flight，适合 LightStore SDK 的 RS/replica fan-out；
+- 按 stripe set 并发且控制每 target in-flight，同样适用于客户端对 replica/EC fragment 的 fan-out；
 - target-local offset 压缩避免为其他 targets 留洞；
 - original owner/path hint 在 rename 后保持物理定位稳定；
 - 精确 stat 通过 per-target versioned dynamic attrs 汇总，不污染每次 append 热路径。
 
-### 需保持 LightStore 差异
+### 面向海量小文件/EC 系统应有的不同选择
 
-- LightStore volume packing 对海量小 record 更合适，不能退化为一 record 一底层文件；
-- LightStore 的 replica/RS EC 应由系统自身校验和修复，不依赖每台机器的 local RAID 作为唯一保护；
-- LightStore Location/volume epoch 能支持 compaction/GC 和重定位，需保留比 BeeGFS 静态 vector 更明确的版本切换；
-- `fsync`/durability 契约应从 SDK、DataServer WAL/volume 到 device 明确定义，避免配置项组合才能推导语义。
+- 海量小 record 更适合打包式布局（多个 record 共享大文件/extent），不能退化为一 record 一底层文件；
+- replica/EC 应由系统自身校验和修复，不依赖每台机器的 local RAID 作为唯一保护；
+- 若数据位置支持 compaction/GC 和重定位，需要比 BeeGFS 静态 target vector 更明确的版本（epoch）切换；
+- `fsync`/durability 契约应从客户端、数据服务 WAL/volume 到 device 明确定义，避免配置项组合才能推导语义。
 
 ## 15. PoC 验收矩阵
 

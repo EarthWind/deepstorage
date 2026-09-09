@@ -182,11 +182,11 @@ CephFS snapshot 与 mirror 都不是离线、不可篡改备份。推荐至少�
 
 恢复演练必须包括：从指定 snapshot 恢复应用、远端重新授权/promote、客户端 remount、权限/xattr/ACL/hard link/special file 校验，以及实际 RTO。
 
-## 10. 对 LightStore 的启示
+## 10. 设计启示
 
 1. 快照必须定义“创建返回”“所有 writer 看到 snapshot epoch”“数据版本可回收”的三个时点。
-2. snapshot context/generation 应贯穿 Meta Range、SDK 与 DataServer record，GC 只回收不再被任何 snapshot 引用的 generation。
-3. quota 不能只依赖 SDK 协作；若要做不可信多租户，服务端 admission 和 physical reservation 必须强制。
+2. snapshot context/generation 应贯穿元数据服务、客户端与数据节点记录，GC 只回收不再被任何 snapshot 引用的 generation。
+3. quota 不能只依赖客户端协作；若要做不可信多租户，服务端 admission 和 physical reservation 必须强制。
 4. tenant namespace、data placement、encryption key、quota、snapshot 和 DR policy 应是同一管理对象。
 5. 异步 mirror 要把 last-complete-checkpoint 作为一等状态，禁止用“daemon healthy”代替 RPO。
 6. 海量小记录快照应基于 volume/segment COW 或 manifest，而不是每 record 版本对象。

@@ -16,7 +16,7 @@ BeeGFS 是面向 HPC、AI/HPC 融合与高吞吐共享文件场景的并行 POSI
 3. **默认语义偏向性能。** 默认元数据 TTL、客户端数据缓存、本地 `flock`/range lock、非全局 append lock，意味着跨客户端工作负载不能只凭“POSIX 文件接口”推断出强 POSIX 一致性。
 4. **Buddy Mirroring 是同步双副本，不是共识协议。** 正常路径等待副本；降级或副本通信异常时，系统会以状态传播、切换和后续 resync 收敛。官方明确记录了状态传播窗口及特定 `fsync` 故障下的数据丢失边界。
 5. **管理面是必须保护的单一权威数据库。** BeeGFS 8 管理服务使用 SQLite WAL 保存节点、目标、存储池、Buddy Group 和根 inode 映射；内建数据/元数据镜像不等于管理服务自身具有 Raft 级容错。
-6. **本地文件承载对象降低了实现复杂度，但放大 inode 和小文件成本。** 每个元数据对象、每个文件在各条带目标上的 chunk 都会消耗底层文件系统对象；BeeGFS 没有 LightStore 式 volume packing，也没有核心数据路径上的 EC。
+6. **本地文件承载对象降低了实现复杂度，但放大 inode 和小文件成本。** 每个元数据对象、每个文件在各条带目标上的 chunk 都会消耗底层文件系统对象；BeeGFS 没有小文件打包（volume packing）机制，也没有核心数据路径上的 EC。
 7. **8.4 的 Remote Storage Targets 是异步数据管理层。** 它可同步到 S3 兼容存储并支持 stub/恢复，但自动同步是 best-effort，不构成主数据路径的透明分层一致性或备份保证。
 
 ## 文档索引
@@ -29,7 +29,7 @@ BeeGFS 是面向 HPC、AI/HPC 融合与高吞吐共享文件场景的并行 POSI
 | [beegfs-consistency.md](beegfs-consistency.md) | 一致性语义矩阵、缓存失效、锁、append、跨节点事务和应用约束 |
 | [beegfs-ha-recovery.md](beegfs-ha-recovery.md) | Buddy Mirroring、目标状态机、切换、resync、fsck、备份与故障矩阵 |
 | [beegfs-operations.md](beegfs-operations.md) | 部署、容量规划、监控、基准、扩容、安全、许可、RST 与运维清单 |
-| [beegfs-analysis.md](beegfs-analysis.md) | 技术取舍、适用性、与 LightStore 对照、可借鉴机制和验证计划 |
+| [beegfs-analysis.md](beegfs-analysis.md) | 技术取舍、适用性评分、与其他系统定位、通用设计启示、选型建议和 PoC 计划 |
 | [sources.md](sources.md) | 调研方法、版本/源码基线、官方资料和证据强度说明 |
 
 ## 建议阅读路径

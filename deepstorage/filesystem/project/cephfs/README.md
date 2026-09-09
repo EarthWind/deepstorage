@@ -16,7 +16,7 @@ CephFS 是构建在 RADOS 之上的分布式共享文件系统：MDS 管理 name
 
 这条路线在通用 Linux 共享文件、HPC/AI 训练、Kubernetes RWX、用户目录和多协议共享上成熟且完整，但有明确成本：MDS 大部分工作仍受单线程/单 rank CPU 和内存缓存约束；文件数据默认按 4 MiB RADOS 对象组织且不做小文件内联/打包；强缓存一致性会把慢客户端、cap recall 和故障切换耦合进尾延迟；故障恢复可能退化为长 journal replay 或全池扫描；快照镜像是异步、按目录快照驱动的复制，不等价于同步双活。
 
-对 LightStore 而言，CephFS 最值得吸收的是：authority 与持久副本解耦、目录内可分片、journal 化 authority 迁移、caps 撤销与 epoch fencing、显式恢复状态机、异步 purge backlog、backtrace + scrub + damage table 的可修复性闭环。最不应照搬的是：以全 POSIX 和全局协作缓存为中心的复杂度、每个文件映射多个独立对象、MDS 缓存容量决定 metadata 性能的工作集模型，以及把万亿级小记录恢复建立在全对象扫描之上。
+对设计新分布式存储系统的读者而言，CephFS 最值得吸收的是：authority 与持久副本解耦、目录内可分片、journal 化 authority 迁移、caps 撤销与 epoch fencing、显式恢复状态机、异步 purge backlog、backtrace + scrub + damage table 的可修复性闭环。最不应照搬的是：以全 POSIX 和全局协作缓存为中心的复杂度、每个文件映射多个独立对象、MDS 缓存容量决定 metadata 性能的工作集模型，以及把万亿级小记录恢复建立在全对象扫描之上。
 
 ## 2. 关键结论
 
@@ -46,7 +46,7 @@ CephFS 是构建在 RADOS 之上的分布式共享文件系统：MDS 管理 name
 6. [快照、子卷、配额与镜像](cephfs-snapshots-tenancy.md)：SnapRealm、COW、subvolume、多租户和 DR。
 7. [高可用、恢复与数据修复](cephfs-ha-recovery.md)：standby、replay 状态机、scrub 和灾难恢复。
 8. [生产运维、性能与安全](cephfs-operations.md)：容量规划、监控、压测、升级、CephX 和加密。
-9. [技术评估与 LightStore 对照](cephfs-analysis.md)：设计取舍、适配结论、可吸收机制和 PoC 建议。
+9. [技术评估与设计启示](cephfs-analysis.md)：设计取舍、可借鉴机制、通用设计建议、选型决策和 PoC 建议。
 
 ## 4. 阅读建议
 
@@ -59,4 +59,4 @@ CephFS 是构建在 RADOS 之上的分布式共享文件系统：MDS 管理 name
 
 CephFS 适合需要成熟 Linux 文件语义、共享读写、统一 Ceph 基础设施、横向数据吞吐和完整运维工具链的团队。它不是一个“只部署 MDS 就能得到的文件系统”，而是完整 Ceph 集群之上的服务；可用性和性能同时依赖 MON quorum、MDS rank/standby、metadata/data pool、OSD/PG/CRUSH、客户端版本和网络。
 
-若目标是 `10^12–10^13` 个小记录、EiB 级 append-only volume、SDK 原生 API 与可控的一致性面，CephFS 更适合作为机制参考和对照基线，而不是 LightStore 的直接替代。任何生产采用都应以本地硬件、真实 namespace 分布和故障注入结果为准。
+若目标 workload 是万亿级小记录、EiB 级容量、SDK 原生 API 与可收窄的一致性面，CephFS 更适合作为机制参考和对照基线，而不是直接选型对象。任何生产采用都应以本地硬件、真实 namespace 分布和故障注入结果为准。

@@ -103,17 +103,17 @@ struct lu_fid {
 查询 `sequence → target` 的映射。FLD 表很小（O(sequence 数)，不是 O(文件数)），
 可以完整缓存在客户端。
 
-### 与 LightStore 的对照
+### 设计启示：ID 分段与位置解耦
 
-LightStore 的 `InodeID` 是"高位为分配段（按 Range 划拨），低位段内自增"——
-**这与 Lustre 的 seq + oid 是同一手法**：把 ID 空间切段发给各个分片，
+"高位为分配段（按分片划拨），低位段内自增"是分布式文件系统分配 inode ID
+的常见手法——**与 Lustre 的 seq + oid 是同一思路**：把 ID 空间切段发给各个分片，
 段本身就编码了位置信息。
 
 Lustre 多做了一步：把段（sequence）与位置的映射独立成 FLD 服务，
-因此**段可以迁移**（改 FLD 映射即可），而 ID 不变。LightStore 若要支持
-Range 分裂后 inode 不重编号，需要等价机制——目前设计文档里
-Range 分裂是按 key 范围切的，inode ID 的高位段与 Range 的对应关系
-在分裂后如何维持，值得明确。
+因此**段可以迁移**（改 FLD 映射即可），而 ID 不变。采用按 ID 段分片的新系统
+若要支持分片分裂后 inode 不重编号，需要等价机制——尤其当分片分裂是按
+key 范围切的时候，inode ID 的高位段与分片的对应关系在分裂后如何维持，
+是设计早期就应明确的问题。
 
 ## 5. 文件 = MDT inode + OST 对象集合
 
@@ -142,12 +142,13 @@ struct filter_fid {
 ```
 
 **这个反向指针是 LFSCK 在线修复的基础**：扫描 OST 对象就能知道它属于谁，
-不需要反查全局索引。LightStore 的 record 头部含 `owner=(inode, file_offset)`
-是完全一样的设计，此处是成熟系统的印证。
+不需要反查全局索引。在数据记录头部保存"所属文件 + 文件内偏移"这样的反向指针，
+是可扩展一致性检查与垃圾回收的通用前提，此处是成熟系统的印证
+（见 [恢复文档](lustre-recovery.md) §5）。
 
 注意 `ff_layout_version` 和 `ff_range`：**OST 对象自己知道它属于哪个版本的 layout**，
 写入时版本不匹配会被拒绝——这是针对 FLR/迁移场景的 fencing，
-与 CubeFS 的 `vuid.epoch`、LightStore 的 `vol_epoch` 是同类机制。
+与 CubeFS 的 `vuid.epoch` 是同类机制。
 
 ## 6. 三条路线的对比
 

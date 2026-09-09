@@ -203,11 +203,11 @@ SLA 不应写成“有 standby，所以 15 秒恢复”；应通过故障注入�
 9. scrub damage 注入与 damage table 处置；
 10. 只在隔离测试集群演练 journal/data-scan 工具。
 
-## 13. 对 LightStore 的启示
+## 13. 设计启示
 
-1. Meta Range Raft election 完成不等于应用恢复；需要 replay、lease invalidation、client retry 和 cache warmup 的可观察状态机。
-2. failure detection、leader epoch 和 DataServer fence epoch 必须联动，防旧 writer 恢复。
+1. 元数据 shard 的 leader 选举或 authority 接管完成不等于应用恢复；需要 replay、lease invalidation、client retry 和 cache warmup 的可观察状态机。
+2. failure detection、leader epoch 和数据节点 fence epoch 必须联动，防旧 writer 恢复。
 3. journal/manifest 定期 checkpoint，限制最坏 replay 长度，并监控不可 trim 原因。
-4. 数据记录保存 tenant/object/version/backpointer/checksum，支持从 volume 局部重建 metadata，但主恢复路径应依赖增量索引/备份而非扫 EiB 全池。
+4. 数据记录保存 tenant/object/version/backpointer/checksum，支持从数据容器（volume/segment）局部重建 metadata，但主恢复路径应依赖增量索引/备份而非扫描整个数据池。
 5. 区分 metadata damage、data fragment loss、logical orphan 和 stale placement，并为每类建立 damage table/reconciler。
 6. 任何 destructive recovery tool 默认 offline、dry-run、导出备份、operation ID 和审计日志。

@@ -7,7 +7,7 @@
 ## 1. 存储层次
 
 ```
-Data Partition（默认 120 GiB，3 副本，= LightStore 的 Volume）
+Data Partition（默认 120 GiB，3 副本，放置/复制/修复的单元）
   └─ Extent（分区内的一个本地文件）
        ├─ Normal Extent：ID ≥ 1024，最大 128 MiB，一个 extent 属于一个文件
        └─ Tiny Extent：ID 1~64，每个 DP 固定 64 个，多个小文件共享追加
@@ -30,7 +30,7 @@ Extent 在本地就是一个普通文件，文件名即 extent ID。CRC 按 128K
 
 ## 2. Tiny Extent：小文件打包
 
-这是 CubeFS 与 LightStore 的 Haystack 打包最直接对应的机制。
+这是 CubeFS 的 Haystack 式小文件打包机制。
 
 每个 DP 启动时预创建 64 个 tiny extent（`datanode/storage/extent_store.go:1181`）：
 
@@ -55,7 +55,7 @@ for extentID = TinyExtentStartID; extentID < TinyExtentStartID+TinyExtentCount; 
 
 ### 2.1 小文件删除：打洞，而不是 compaction
 
-这是本次调研**最值得 LightStore 借鉴的一个点**。
+这是本次调研中**最值得借鉴的一个点**。
 
 删除一个 tiny extent 里的小文件，CubeFS 不做卷内 compaction，而是直接打洞
 （`datanode/storage/extent.go:787`）：
@@ -85,10 +85,10 @@ os.Remove(extentFilePath)         // 整个 extent 删光 → 直接删文件
 
 三条路径都不涉及数据搬迁。
 
-**对 LightStore 的意义**：设计文档里 Volume 的回收路径是
-`SEALED → COMPACTING → DROPPED`，即卷内 compaction 搬迁存活 record。
-如果 record 落在本地文件上，打洞可以让"卷内死数据回收"这件事的绝大部分场景
-不需要真正的 compaction——只有当整卷存活率极低、想回收整个卷时才需要搬迁。
+**设计启示**：采用 append-only 卷 + 小文件打包的系统，通常把卷内死数据回收
+设计成"密封 → compaction 搬迁存活记录 → 丢弃旧卷"。如果记录落在本地文件上，
+打洞可以让"卷内死数据回收"这件事的绝大部分场景不需要真正的 compaction——
+只有当整卷存活率极低、想回收整个卷时才需要搬迁。
 这能省掉大量 IO 和一整套搬迁-换址-更新索引的复杂逻辑。
 
 需要注意的限制（见 [分析文档](cubefs-analysis.md) §2.2）：
@@ -132,21 +132,21 @@ for index := 0; index < len(response.followersAddrs); index++ {
 代价是**可用性对副本故障敏感**：一个副本慢，所有写都慢；一个副本挂，
 该 DP 立即不可写（要等 Master 把它标记为只读并补充新 DP）。
 
-### 3.2 与 LightStore 的对照
+### 3.2 星型 vs 链式复制
 
-LightStore 的设计是"主副本定序，链式复制"+"故障处理即 seal-and-new"。
-这与 CubeFS 是**同一个思路**：
+CubeFS 的复制拓扑是**星型**：主副本收到 packet 后并发转发给所有 follower。
+另一种常见拓扑是**链式**（主 → 从 → 从的 pipeline 写）。两者都可以配合
+"等待全部副本确认 + 失败即换址重写"，差别只在拓扑：
 
-| | CubeFS | LightStore |
+| | 星型（CubeFS） | 链式 |
 |---|--------|-----------|
-| 拓扑 | 星型（主 → 所有从并发） | 链式（主 → 从 → 从） |
-| 确认 | 等待全部 | 等待全部（密封长度对齐） |
-| 失败 | 换 extent/DP 重写 | seal-and-new |
+| 数据流 | 主 → 所有从，并发 | 主 → 从 → 从 |
+| 写延迟 | 一跳 | N 跳累加 |
+| 主副本出口带宽 | N 倍写入量 | 1 倍写入量 |
 
-星型 vs 链式的取舍：星型延迟低（一跳），但主副本出口带宽是 N 倍写入量；
-链式带宽均衡，但延迟是 N 跳累加。LightStore 选链式，对大块顺序写是合理的
-（带宽比延迟重要）；但对小文件写入，链式的延迟劣势会放大。
-**建议：小文件（tiny record）走星型，大块走链式**，CubeFS 的单一星型选择
+星型延迟低，但主副本出口带宽是 N 倍写入量；链式带宽均衡，但延迟是 N 跳累加。
+对大块顺序写，链式是合理的（带宽比延迟重要）；对小文件写入，链式的延迟劣势会放大。
+一种折中是**小文件走星型，大块走链式**；CubeFS 的单一星型选择
 说明它主要优化的是延迟。
 
 ## 4. 客户端写路径
@@ -212,13 +212,13 @@ handler.pushToRequest(packet)    // 把失败的 packet 重放到新 handler
 因为 tiny extent 数量有限（64 个），写 tiny 失败很可能就是因为没有可用的 tiny extent 了，
 在同类资源上重试只会再失败一次。
 
-LightStore 的 SDK 在选卷重试时应该有等价规则：**失败重试要换资源类别，不只是换实例。**
+这条规则可以推广为通用经验：**失败重试要换资源类别，不只是换实例。**
 
 ### 4.2 提交时机
 
 ExtentKey 在 handler 关闭（写满 128MiB / flush / close）时提交给 MetaNode。
-在此之前数据已经在 DataNode 上，但元数据不可见——与 LightStore 的
-"攒批 64 MiB 或 Sync/Close 时 CommitExtents" 是同一模式。
+在此之前数据已经在 DataNode 上，但元数据不可见——这是"客户端攒批提交索引，
+在 flush/close 时才让写入对元数据可见"的常见模式。
 
 ## 5. 读路径
 
@@ -251,7 +251,7 @@ Tiny extent 的修复要额外处理打洞造成的空洞——所以有独立�
 `tinyDeleteRecordFile` 记录删除操作，修复时重放这些删除。
 这是打洞方案的一个隐藏成本：**空洞本身成了需要复制的状态**。
 
-LightStore 若采用打洞，同样需要一份"删除记录"随卷复制，否则新副本会把
+任何采用打洞回收的系统都需要一份"删除记录"随卷复制，否则新副本会把
 已删数据当成有效数据补回来。
 
 ## 7. Master 的角色
@@ -274,7 +274,7 @@ Master 会缓存 DP 内**每个 extent 文件**的副本状态用于一致性检
 一个 120GiB 的 DP 可能有上千个 normal extent，乘以集群里的 DP 数量，
 这是 Master 内存里一份 O(extent 数) 的状态——**违背了"中心组件状态与文件数解耦"的原则**。
 
-LightStore 的设计原则第 1 条明确禁止了这一点（Manager 只保存 O(集群规模) 状态）。
+中心管控组件的一条基本原则是"只保存 O(集群规模) 的状态，不保存任何 per-file / per-record 信息"。
 CubeFS 这里是个反例，值得引以为戒。
 
 ---
