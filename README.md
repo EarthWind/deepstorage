@@ -9,6 +9,7 @@
 ```
 deepstorage/
 └── filesystem/
+    ├── papers/      分布式文件存储重要论文清单（2000 – 2026.08）
     └── project/
         ├── 3fs/         DeepSeek 3FS（Fire-Flyer File System）
         ├── beegfs/      BeeGFS
@@ -36,9 +37,11 @@ deepstorage/
 | Lustre | 内核态 HPC 并行文件系统，MDT / OST 分离，LDLM 分布式锁提供强 POSIX 语义 | `lustre/lustre-release@eadb94b`（2026-07-13，master） | 2026-07-13 | [lustre/README.md](deepstorage/filesystem/project/lustre/README.md) |
 | SeaweedFS | Haystack 思路的小对象存储，叠加 Filer 命名空间、S3 Gateway、FUSE 等多种接口 | `seaweedfs/seaweedfs` tag `4.41`（2026-08-06） | 2026-08-08 | [seaweedfs/README.md](deepstorage/filesystem/project/seaweedfs/README.md) |
 
-## 论文调研
+## 论文清单与论文调研
 
-[papers/](deepstorage/filesystem/project/papers/README.md) 收录 2020 年（含）之后发表于 FAST / OSDI / SOSP / ATC / EuroSys / NSDI / ASPLOS / SC / SoCC 等会议的分布式文件系统论文，以及少量经核实的工业界技术报告，按五个方向组织：
+[filesystem/papers/](deepstorage/filesystem/papers/README.md) 给出 2000 年至 2026 年 8 月的重要论文清单：核心必读 25 篇，以及按生产系统、元数据、数据路径、复制与共识、纠删码、HPC / AI 存储、客户端、新硬件、可靠性实证分类的完整列表和按年份索引。
+
+[filesystem/project/papers/](deepstorage/filesystem/project/papers/README.md) 收录 2020 年（含）之后发表于 FAST / OSDI / SOSP / ATC / EuroSys / NSDI / ASPLOS / SC / SoCC 等会议的分布式文件系统论文，以及少量经核实的工业界技术报告，按五个方向组织：
 
 1. [工业界大规模生产系统](deepstorage/filesystem/project/papers/industry-production-systems.md)：Tectonic、Pangu、Fisc、Baidu CFS、3FS、FalconFS、Colossus 等
 2. [元数据扩展性](deepstorage/filesystem/project/papers/metadata-scalability.md)：InfiniFS、SingularFS、λFS、FileScale、Mantle、HMFS、MesaFS、SwitchFS 等
@@ -68,7 +71,8 @@ deepstorage/
 
 - **快速选型**：先读目标系统的 `README.md`，再读 `*-analysis.md` 中的适用性评分与选型建议。
 - **架构评审**：按 overview → metadata → data-path → consistency → ha-recovery 的顺序阅读。
-- **设计新系统**：横向阅读各系统 `*-analysis.md` 中"可借鉴 / 应规避的设计"章节，并对照 [papers/](deepstorage/filesystem/project/papers/README.md) 的元数据扩展性与工业界生产系统两篇。
+- **入门与补课**：从 [论文清单](deepstorage/filesystem/papers/essential-papers-2000-2026.md) 的核心必读 25 篇开始。
+- **设计新系统**：横向阅读各系统 `*-analysis.md` 中"可借鉴 / 应规避的设计"章节，并对照 [论文调研](deepstorage/filesystem/project/papers/README.md) 的元数据扩展性与工业界生产系统两篇。
 - **准备 PoC 或上线**：重点阅读 operations 文档，并把 ha-recovery 文档中的故障注入项纳入验收。
 - **核验结论**：通过各目录 `sources.md` 回到固定版本源码与官方文档。
 
