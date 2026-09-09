@@ -89,7 +89,7 @@ HTTP GET -> Nginx + fastdfs-nginx-module -> local file/trunk slot
 - [高可用、扩缩容与恢复](fastdfs-ha-recovery.md)：tracker leader、网络分区、节点加入、单盘恢复和跨机房模式。
 - [部署、运维、监控与安全](fastdfs-operations-security.md)：生产拓扑、配置基线、可观测性、升级、备份和安全加固。
 - [性能模型与验证方案](fastdfs-performance.md)：瓶颈推导、benchmark 可信边界和分阶段 PoC。
-- [技术评估与 LightStore 映射](fastdfs-analysis.md)：优缺点、场景评分、采用门槛、可借鉴与不宜照搬。
+- [技术评估、设计启示与采用建议](fastdfs-analysis.md)：优缺点、场景评分、与大规模 volume 式存储的设计要点对比、可借鉴的机制与应规避的设计、采用门槛和 PoC 阶段。
 - [资料来源、版本基线与研究方法](sources.md)：一手证据、源码锚点、术语和研究限制。
 
 ## 适用与不适用场景

@@ -55,9 +55,9 @@ AI 训练的 I/O 模式与传统 HPC 明显不同：
   - **Hadash 数据管理工具**：提供 BB 内高效数据查询，并加速 BB 与传统 HPC 存储（Lustre 类后端）之间的数据迁移。
 - **关键结果**：部署于新一代神威超算，服务数百个应用；支撑最多 **600,000 客户端**并发；聚合 I/O 带宽 **3.1 TB/s**。
 - **局限**：面向超算专用互连与作业模型；放松 POSIX（弱化目录语义、rename 等）；元数据的全局视图需要显式同步，通用工作负载不适用。
-- **对 LightStore 的启示**：
-  - "客户端 → 固定服务端"的本地化分诊思路可借鉴到 LightStore 的写路径：客户端优先向少数固定 DataServer 的 OPEN volume 追加，天然避免全连接风暴，与现有 append-only Volume 模型契合。
-  - 元数据一致性分级值得参考：LightStore MetaServer 是线性一致的 Range Raft，可考虑为 AI/HPC 场景提供"作业私有命名空间 + 延迟发布"的弱一致快速路径。
+- **设计启示**：
+  - "客户端 → 固定服务端"的本地化分诊思路可借鉴到写路径：客户端优先向少数固定存储节点追加，天然避免全连接风暴，与 append-only 数据布局契合。
+  - 元数据一致性分级值得参考：即使元数据服务本身是线性一致的，也可考虑为 AI/HPC 场景提供"作业私有命名空间 + 延迟发布"的弱一致快速路径。
 
 ### 2.2 DAOS: A Scale-Out High Performance Storage Stack for Storage Class Memory
 
@@ -72,9 +72,9 @@ AI 训练的 I/O 模式与传统 HPC 明显不同：
   - **丰富接入层**：原生对象 API 之上提供 POSIX（libdfs/dfuse）、MPI-IO、HDF5 等中间件适配。
 - **关键结果**：论文给出 IO500 基准的初始性能；此后 DAOS 长期位居 IO500 榜单前列（如 SC21 期间 QCT 系统进入总榜第 16、10 节点挑战第 12），并成为 Argonne Aurora（EiB 级、待确认具体容量）的主存储，在 MLPerf Storage 中亦有领先表现。
 - **局限**：深度绑定 Optane PMem（Intel 已停产 Optane，后续版本转向 "Metadata-on-NVMe" 架构，见 DAOS "Beyond Persistent Memory" 后续论文）；运维复杂度高；强依赖 RDMA 网络。
-- **对 LightStore 的启示**：
-  - 用户态数据路径 + SPDK 是 LightStore DataServer 追求 TB/s 级聚合带宽的可行路线；小 I/O 与元数据放低延迟介质、大 I/O 直下 NVMe 的分流思想与 LightStore "小文件打包进 volume" 互补。
-  - DAOS 的教训：不要把持久化格式绑死在特定硬件（PMem）；LightStore 的 append-only volume 对介质假设弱，是更稳健的选择。
+- **设计启示**：
+  - 用户态数据路径 + SPDK 是存储节点追求 TB/s 级聚合带宽的可行路线；小 I/O 与元数据放低延迟介质、大 I/O 直下 NVMe 的分流思想与"小文件打包进大块存储单元"互补。
+  - DAOS 的教训：不要把持久化格式绑死在特定硬件（PMem）；对介质假设弱的 append-only 布局是更稳健的选择。
 
 ### 2.3 DeltaFS: A Scalable No-Ground-Truth Filesystem For Massively-Parallel Computing
 
@@ -88,8 +88,8 @@ AI 训练的 I/O 模式与传统 HPC 明显不同：
   - 元数据以 LSM 结构（源自 IndexFS 系）打包成不可变 SSTable 存入共享底层存储，作业间以数据形式传递元数据。
 - **关键结果**：在 LANL 超算上验证元数据吞吐随计算节点数近线性扩展，创建风暴场景相对传统全局文件系统有数量级加速（具体规模与倍数待确认）。
 - **局限**：放弃全局命名空间对交互式/多租户场景不友好；快照合并把一致性责任推给应用与工作流层；主要适配批处理科学工作流。
-- **对 LightStore 的启示**：
-  - LightStore 走的是"全局命名空间 + 数千 Range Raft"的强一致路线，与 DeltaFS 相反；但 DeltaFS 证明了**元数据即数据（metadata as data）**的价值：可考虑支持"批量导入"接口——作业先在本地生成排序好的 KV SSTable，再整体 ingest 进 MetaServer 的 Range，绕开逐条 Raft 提交，服务 AI 数据集导入与 HPC 创建风暴。
+- **设计启示**：
+  - 对走"全局命名空间 + 分片共识复制"强一致路线的系统，DeltaFS 是相反的极端；但它证明了**元数据即数据（metadata as data）**的价值：可考虑支持"批量导入"接口——作业先在本地生成排序好的 KV SSTable，再整体 ingest 进元数据分片，绕开逐条共识提交，服务 AI 数据集导入与 HPC 创建风暴。
 
 ### 2.4 UnifyFS: A User-level Shared File System for Unified Access to Distributed Local Storage
 
@@ -103,8 +103,8 @@ AI 训练的 I/O 模式与传统 HPC 明显不同：
   - **lamination（层压）语义**：文件在显式同步点之前只保证写者可见，laminate 之后变为全局只读可见——用放松的可见性语义换取无锁的高并发写。
 - **关键结果**：在 Summit/Frontier 级系统上验证了聚合带宽随节点数近线性扩展、N-1 共享写显著优于并行文件系统直写（具体数字待确认）。
 - **局限**：作业生命周期文件系统，数据持久性依赖显式下刷到后端 PFS；放松语义要求应用遵守"写完再读"的模式。
-- **对 LightStore 的启示**：
-  - lamination 与 LightStore volume 的 `OPEN → SEALED` 生命周期在理念上同构（密封后永久只读）；可把这一语义上提到文件层：为 checkpoint/训练产物提供"追加期私有、密封后共享"的文件状态机，简化一致性协议。
+- **设计启示**：
+  - lamination 与 append-only 存储单元的 `OPEN → SEALED` 生命周期在理念上同构（密封后永久只读）；可把这一语义上提到文件层：为 checkpoint/训练产物提供"追加期私有、密封后共享"的文件状态机，简化一致性协议。
 
 ### 2.5 GekkoFS：临时 burst buffer 文件系统（2020 后续期刊论文）
 
@@ -117,8 +117,8 @@ AI 训练的 I/O 模式与传统 HPC 明显不同：
   - 客户端以 syscall 拦截库接入；数据按固定 chunk 切分 hash 分布。
 - **关键结果**：元数据操作（create/stat/remove）吞吐随节点数近线性扩展，512 节点规模达到数千万 ops/s 量级（具体数字待确认）；是欧洲 ADA-FS/NEXTGenIO 项目的核心成果，后续衍生大量 ad-hoc FS 对比研究（如 FGCS 2025 的比较研究）。
 - **局限**：hash 分布使目录局部性丢失；临时性质，不管持久化与容错；一节点故障即数据不完整。
-- **对 LightStore 的启示**：
-  - GekkoFS 代表"hash 扁平命名空间"极端，LightStore 的 Range 分片保留了目录局部性（一个目录的 dentry 连续），对 `ls`/遍历更友好；但 GekkoFS 提示：对 AI 训练这类"只按已知路径 open"的负载，可提供 hash 直达的 fast-path（跳过逐级路径解析），与 FalconFS 的结论互相印证。
+- **设计启示**：
+  - GekkoFS 代表"hash 扁平命名空间"极端；Range 分片保留目录局部性（一个目录的 dentry 连续），对 `ls`/遍历更友好；但 GekkoFS 提示：对 AI 训练这类"只按已知路径 open"的负载，可提供 hash 直达的 fast-path（跳过逐级路径解析），与 FalconFS 的结论互相印证。
 
 ### 2.6 CHFS: Parallel Consistent Hashing File System for Node-local Persistent Memory
 
@@ -131,8 +131,8 @@ AI 训练的 I/O 模式与传统 HPC 明显不同：
   - **三个"消除"**：消除专职元数据服务器、消除关键路径上的顺序执行、消除中心化数据管理——节点加入/退出仅影响一致性 hash 环上相邻区间。
 - **关键结果**：元数据与数据访问性能随节点数扩展性优于对比系统（GekkoFS 等，具体数字待确认）；后续有基于 CHFS 的缓存文件系统等衍生工作（待确认）。
 - **局限**：依赖 PMem（同样受 Optane 停产影响）；一致性 hash 的负载均衡在倾斜负载下弱于按需分裂的 Range 分片；语义放松。
-- **对 LightStore 的启示**：
-  - 印证了"文件系统 KV 化"的大方向（LightStore 已采用：inode/dentry/extent 全 KV 化）；差异在于 LightStore 选择 Range+Raft（强一致、可分裂）而非一致性 hash（最终一致、静态均衡），前者更适合作为持久共享存储而非临时 BB。
+- **设计启示**：
+  - 印证了"文件系统 KV 化"（inode/dentry/extent 全 KV 化）的大方向；分片策略上，Range + Raft（强一致、可分裂）与一致性 hash（最终一致、静态均衡）各有取舍，前者更适合作为持久共享存储而非临时 BB。
 
 ---
 
@@ -152,10 +152,10 @@ AI 训练的 I/O 模式与传统 HPC 明显不同：
   - 明确不做读 cache（数据集远大于内存、随机访问缓存无益），把内存留给应用。
 - **关键结果**：生产部署 **180 个存储节点**（每节点 16×14 TiB NVMe、2×200 Gbps InfiniBand），聚合读带宽 **6.6 TiB/s**（另有资料称峰值 7.3 TB/s）；GraySort 基准 25 节点 3.66 TiB/min（待确认）；KVCache 读峰值 40 GiB/s（待确认）。支撑 DeepSeek-V3/R1 的训练与推理。
 - **局限**：强依赖 RDMA 与高端 NVMe；FoundationDB 元数据路径的延迟与吞吐上限（每操作事务开销）在元数据密集场景可能成为瓶颈；FUSE 路径性能损失明显（官方以 USRBIO 弥补）；无会议论文，公开性能数据多为自述。
-- **对 LightStore 的启示**：
-  - **与 LightStore 架构高度可对话**：3FS 的"无状态元数据 + 外部事务 KV"对应 LightStore 的 MetaServer（区别：LightStore 自研 Range Raft，避免了外部 FoundationDB 依赖，但要自己解决跨 Range 事务）。
-  - CRAQ 的"读打散到全部副本"值得 DataServer 借鉴：LightStore volume 密封后永久只读，天然可以任意副本读、无需读主，应在读路径明确利用这一点。
-  - 原生异步 API 优先、FUSE 只做兼容层的接口策略，与 LightStore "C++ SDK 为一等公民、FUSE 后置"的规划一致，可坚定该路线。
+- **设计启示**：
+  - "无状态元数据 + 外部事务 KV"与"自研分片 Raft 元数据"是两条路线：前者省去自研共识与持久化，后者避免外部 FoundationDB 依赖，但要自己解决跨分片事务。
+  - CRAQ 的"读打散到全部副本"值得存储节点借鉴：数据密封后永久只读，天然可以任意副本读、无需读主，应在读路径明确利用这一点。
+  - 原生异步 API 优先、FUSE 只做兼容层的接口策略，是"原生 SDK 为一等公民、FUSE 后置"路线的有力佐证。
 
 ### 3.2 FalconFS: Distributed File System for Large-Scale Deep Learning Pipeline
 
@@ -169,9 +169,9 @@ AI 训练的 I/O 模式与传统 HPC 明显不同：
   - **惰性命名空间复制（lazy namespace replication）**：目录结构在元数据节点间按需惰性复制，使各节点能本地完成路径解析，同时保持目录变更代价可控。
 - **关键结果**：对比 CephFS 与 Lustre：小文件读写吞吐最高 **5.72×**，DL 模型训练吞吐最高 **12.81×**；已在华为自动驾驶生产环境（**10,000 NPU** 集群）运行一年，已开源。
 - **局限**：面向"路径已知、直接 open"的负载，目录枚举/rename 类操作非重点；hash 分布对超大目录/热点目录的均衡有代价（细节待确认）。
-- **对 LightStore 的启示**：
-  - 最直接相关的近期工作。LightStore 的 Range 分片按 key 范围保目录局部性，路径解析仍需逐级（父目录 → dentry → inode）；FalconFS 证明 AI 负载下**单 RPC lookup** 收益巨大——可在 MetaServer 增加"全路径 → inode"的辅助索引或服务端路径解析代理，作为 AI 场景 fast-path。
-  - "无状态客户端"提示 LightStore SDK：对训练负载默认关闭元数据缓存、改为服务端批量 lookup（如 open 一个 manifest 内全部文件），比在客户端堆缓存更有效。
+- **设计启示**：
+  - 按 key 范围分片保目录局部性的元数据设计，路径解析仍需逐级（父目录 → dentry → inode）；FalconFS 证明 AI 负载下**单 RPC lookup** 收益巨大——可在元数据服务增加"全路径 → inode"的辅助索引或服务端路径解析代理，作为 AI 场景 fast-path。
+  - "无状态客户端"提示 SDK 设计：对训练负载默认关闭元数据缓存、改为服务端批量 lookup（如 open 一个 manifest 内全部文件），比在客户端堆缓存更有效。
 
 ### 3.3 Tectonic-Shift: A Composite Storage Fabric for Large-Scale ML Training（简述）
 
@@ -179,7 +179,7 @@ AI 训练的 I/O 模式与传统 HPC 明显不同：
 - **会议年份**：USENIX ATC 2023（注意：非 FAST 2023）
 - **链接**：<https://www.usenix.org/conference/atc23/presentation/zhao>
 - **AI 训练 I/O 角度简述**：Meta 生产 ML 训练的数据存储原先由 HDD 为主的 Tectonic 承担，但训练读的 IOPS 需求使 HDD 的 IO-per-watt 成为扩展瓶颈。Tectonic-Shift 在 Tectonic 之上加一层 flash 缓存层 Shift，用 I/O 高效的 flash 吸收训练读流量，降低对 HDD 容量/主轴数的需求，从而提升整个存储 fabric 的功耗效率。其缓存准入/放置利用训练作业的数据集访问可预测性（训练计划已知即将读什么）。这一"HDD 容量层 + flash 训练读加速层 + 训练感知预取"的分层模式是工业界共识。Tectonic 本体与该论文的完整分析见 [industry-production-systems.md](industry-production-systems.md)。
-- **对 LightStore 的启示**：LightStore 面向 EiB 级低成本（EC + HDD 可行）时，AI 训练读负载不应直接压容量层；应预留"训练读缓存层"位置（独立 flash 缓存集群或 DataServer 内分层），并利用训练侧的访问计划做预取——接口上值得为"数据集即将被顺序/随机全量读"暴露 hint API。
+- **设计启示**：面向 EiB 级低成本（EC + HDD 可行）的系统，AI 训练读负载不应直接压容量层；应预留"训练读缓存层"位置（独立 flash 缓存集群或存储节点内分层），并利用训练侧的访问计划做预取——接口上值得为"数据集即将被顺序/随机全量读"暴露 hint API。
 
 ---
 
@@ -196,7 +196,7 @@ AI 训练的 I/O 模式与传统 HPC 明显不同：
 - **核心设计**：① 基于内容 hash 的寻址，使同一数据集可跨作业、跨用户安全共享缓存；② 与训练框架（PyTorch）协同的 **substitutable cache hits**——随机采样下任何未用过的样本都可替代命中，小缓存也能持续供给命中而不 thrash；③ 按作业对缓存的边际收益动态分配缓存容量。
 - **关键结果**：PyTorch 原型显著提升训练吞吐（论文报告多作业场景下明显加速，具体倍数依负载而异）。
 - **局限**：需要框架配合（改 DataLoader）；只覆盖读缓存，不管元数据与写路径。
-- **对 LightStore 的启示**：内容寻址与 LightStore 的 Loc（volume_id+offset+cookie）思路兼容——可在 SDK 层提供"数据集打包 + 内容 hash 清单"的读取模式，让缓存层跨作业去重；"替代命中"这类语义只能在 SDK/缓存层做，不应侵入 DFS 核心。
+- **设计启示**：内容寻址与"位置句柄直达、免索引"的数据定位思路兼容——可在 SDK 层提供"数据集打包 + 内容 hash 清单"的读取模式，让缓存层跨作业去重；"替代命中"这类语义只能在 SDK/缓存层做，不应侵入 DFS 核心。
 
 ### 4.2 SHADE: Enable Fundamental Cacheability for Distributed Deep Learning Training
 
@@ -207,7 +207,7 @@ AI 训练的 I/O 模式与传统 HPC 明显不同：
 - **核心设计**：观察到样本对训练的**重要性（importance）不均匀**且随训练动态变化；SHADE 以 rank-based 方式在 minibatch 间捕捉样本相对重要性，动态更新重要性分数，优先缓存高重要性样本——把缓存决策从"访问频率"换成"训练价值"。
 - **关键结果**：小缓存下命中率相对 LRU 最高提升 **4.5×**，训练吞吐显著提升（CV 模型验证）。
 - **局限**：依赖重要性采样类训练法的适用性；与训练框架深度耦合。
-- **对 LightStore 的启示**：进一步说明训练缓存策略属于框架/缓存层；LightStore 要做的是把随机读路径做到足够便宜（密封 volume 任意副本读、Loc 直达免索引），让上层缓存失效时代价也可接受。
+- **设计启示**：进一步说明训练缓存策略属于框架/缓存层；DFS 要做的是把随机读路径做到足够便宜（密封数据任意副本读、位置句柄直达免索引），让上层缓存失效时代价也可接受。
 
 ### 4.3 SiloD: A Co-design of Caching and Scheduling for Deep Learning Clusters
 
@@ -218,7 +218,7 @@ AI 训练的 I/O 模式与传统 HPC 明显不同：
 - **核心设计**：把**缓存和远端 I/O 当作与 GPU 同级的一等资源**纳入集群调度：建立"分配多少缓存/带宽 → 作业吞吐"的性能估计模型，统一框架下适配多种调度策略，使调度器联合决策计算与存储资源。
 - **关键结果**：相对存储无感知的调度器显著提升集群聚合吞吐（论文报告最高数倍提升，具体数字待确认）。
 - **局限**：依赖作业吞吐模型准确性；主要针对数据并行训练。
-- **对 LightStore 的启示**：DFS 应向上暴露可观测与可配额的接口：per-tenant/per-job 的带宽配额、缓存命中率与后端 I/O 计量，使上层调度器可以做 SiloD 式联合优化。LightStore Manager 不在 IO 路径上，配额执行应放在 DataServer/SDK。
+- **设计启示**：DFS 应向上暴露可观测与可配额的接口：per-tenant/per-job 的带宽配额、缓存命中率与后端 I/O 计量，使上层调度器可以做 SiloD 式联合优化。配额执行应放在数据路径上的存储节点/SDK，而非不在 IO 路径上的控制面。
 
 ### 4.4 Fluid: Dataset Abstraction and Elastic Acceleration for Cloud-native Deep Learning Training Jobs（简述）
 
@@ -226,7 +226,7 @@ AI 训练的 I/O 模式与传统 HPC 明显不同：
 - **会议年份**：IEEE ICDE 2022；项目现为 CNCF Incubating（2026-01 晋级）
 - **链接**：<https://ieeexplore.ieee.org/document/9835158>；<https://github.com/fluid-cloudnative/fluid>
 - **简述**：Kubernetes 上的"数据集"抽象与弹性缓存编排：把 Alluxio/JuiceFS 等缓存系统包装为可观测、可弹性伸缩、自愈的缓存服务，训练作业以统一方式访问异构底层存储并获得透明加速。与 DFS 的关系是**编排层**而非文件系统本体，故仅简述。
-- **对 LightStore 的启示**：LightStore 若进入云原生 AI 场景，应提供 CSI 驱动与 Fluid runtime 对接点，把自身定位为 Fluid 之下的高性能持久层。
+- **设计启示**：DFS 若进入云原生 AI 场景，应提供 CSI 驱动与 Fluid runtime 对接点，把自身定位为 Fluid 之下的高性能持久层。
 
 ---
 
@@ -241,14 +241,14 @@ AI 训练的 I/O 模式与传统 HPC 明显不同：
 - **核心设计**：① 在线 profiling 自动确定 checkpoint 频率并动态调节以限定开销；② **两阶段 checkpoint**：先在 GPU/CPU 内存快照（snapshot），再异步持久化（persist），与计算流水线化；③ 可恢复数据迭代器，checkpoint 数据加载器状态以保持"每 epoch 每样本恰好一次"的不变式。
 - **关键结果**：恢复时间从小时级降到秒级，运行时开销控制在 **3.5%** 以内。
 - **局限**：单机/数据并行为主，未处理大模型多维并行的分片 checkpoint；存储侧只当黑盒。
-- **对 LightStore 的启示**：checkpoint 写是"快照后异步刷"的顺序大写，与 LightStore append-only volume 完美匹配；应保证 OPEN volume 的追加写延迟稳定（尾延迟影响训练停顿），并考虑为 checkpoint 提供预留卷/预分配（写入方 hint 即将写入 N GB）。
+- **设计启示**：checkpoint 写是"快照后异步刷"的顺序大写，与 append-only 存储布局完美匹配；应保证追加写延迟稳定（尾延迟影响训练停顿），并考虑为 checkpoint 提供预留卷/预分配（写入方 hint 即将写入 N GB）。
 
 ### 5.2 Check-N-Run: A Checkpointing System for Training Deep Learning Recommendation Models（简述）
 
 - **作者/机构**：Assaf Eisenman 等，Meta（Facebook）与 USC
 - **会议年份**：USENIX NSDI 2022
 - **链接**：<https://www.usenix.org/conference/nsdi22/presentation/eisenman>
-- **简述**：针对推荐模型 TB 级 embedding 表的 checkpoint：**差分 checkpoint**（只写每轮被更新的 embedding 部分）+ **量化压缩**，在不影响精度前提下将所需写带宽降低 **6–17×**、容量降低 **2.5–8×**。启示：DFS 无需理解差分逻辑，但要善于处理"高频中等大小追加写 + 版本化对象"模式；LightStore 的 record 追加 + extent 覆盖提交天然支持这种部分更新落盘。
+- **简述**：针对推荐模型 TB 级 embedding 表的 checkpoint：**差分 checkpoint**（只写每轮被更新的 embedding 部分）+ **量化压缩**，在不影响精度前提下将所需写带宽降低 **6–17×**、容量降低 **2.5–8×**。启示：DFS 无需理解差分逻辑，但要善于处理"高频中等大小追加写 + 版本化对象"模式；"记录追加 + extent 覆盖提交"式的数据布局天然支持这种部分更新落盘。
 
 ### 5.3 Gemini: Fast Failure Recovery in Distributed Training with In-Memory Checkpoints
 
@@ -259,7 +259,7 @@ AI 训练的 I/O 模式与传统 HPC 明显不同：
 - **核心设计**：checkpoint 到**主机 CPU 内存**（聚合带宽远高于远端存储）：① 近似最优的 checkpoint 副本放置策略，最大化故障后能从 CPU 内存恢复的概率；② checkpoint 流量与训练通信共享网络，设计流量调度算法交织传输、消除对训练吞吐的干扰；远端持久存储仍作兜底层。
 - **关键结果**：故障恢复比既有方案快 **13× 以上**；实现**每迭代一次** checkpoint；对训练吞吐无可见开销。
 - **局限**：CPU 内存 checkpoint 不抗大面积同时故障（机房级），仍需存储层兜底；占用主机内存与网络。
-- **对 LightStore 的启示**：定位启示——训练系统会把最热的 checkpoint 路径留在计算集群内存里，DFS 承接的是**次频、持久兜底**的 checkpoint 写；LightStore 应优化的是大并发顺序写的聚合带宽与恢复读（restart 时全员并发读同一 checkpoint,密封卷多副本读又一次关键）。
+- **设计启示**：定位启示——训练系统会把最热的 checkpoint 路径留在计算集群内存里，DFS 承接的是**次频、持久兜底**的 checkpoint 写；DFS 应优化的是大并发顺序写的聚合带宽与恢复读（restart 时全员并发读同一 checkpoint，密封数据多副本读又一次关键）。
 
 ### 5.4 ByteCheckpoint: A Unified Checkpointing System for Large Foundation Model Development
 
@@ -270,19 +270,19 @@ AI 训练的 I/O 模式与传统 HPC 明显不同：
 - **核心设计**：① **与并行策略解耦的 checkpoint 表示**，加载时高效 resharding（换并行度重启不需离线转换）；② 统一的保存/加载工作流适配多框架与多存储后端；③ 全栈 I/O 优化（异步流水、去重、负载均衡，细节待确认）＋大规模监控工具。
 - **关键结果**：相对既有开源 checkpoint 系统，运行时 checkpoint 停顿平均降低 **54.2×**，保存最快提升 **9.96×**，加载最快提升 **8.80×**。生产部署于字节跳动。
 - **局限**：checkpoint 框架层工作，存储后端仍为 HDFS/对象存储等黑盒；停顿数字依赖对比基线。
-- **对 LightStore 的启示**：ByteCheckpoint 这类框架就是 LightStore 的直接上游客户——它需要的后端接口是：高并发分片写（数千 rank 各写自己的 shard）、原子提交/manifest（一次 checkpoint 的全部分片可见性一致）、按分片并行读。LightStore 可提供"目录级批量提交"或 manifest 文件原子发布的原语，避免框架自己用 rename 技巧拼装原子性。
+- **设计启示**：ByteCheckpoint 这类框架是 DFS 的直接上游客户——它需要的后端接口是：高并发分片写（数千 rank 各写自己的 shard）、原子提交/manifest（一次 checkpoint 的全部分片可见性一致）、按分片并行读。DFS 可提供"目录级批量提交"或 manifest 文件原子发布的原语，避免框架自己用 rename 技巧拼装原子性。
 
 ---
 
-## 6. 对 LightStore 的总体启示汇总
+## 6. 总体设计启示汇总
 
-1. **读路径**：密封 volume 永久只读是 LightStore 的结构性优势——学习 3FS/CRAQ，把"任意副本读、读打散"做成默认行为，服务 AI 随机读与 checkpoint 恢复的读风暴。
+1. **读路径**：密封后永久只读的数据布局是结构性优势——学习 3FS/CRAQ，把"任意副本读、读打散"做成默认行为，服务 AI 随机读与 checkpoint 恢复的读风暴。
 2. **元数据 fast-path**：FalconFS/HadaFS/GekkoFS 共同指向"AI/HPC 负载不需要逐级路径解析"——在保留全局强一致目录树的同时，提供服务端单 RPC lookup（全路径索引或解析代理）与批量 lookup。
-3. **批量导入与创建风暴**：借鉴 DeltaFS 的 metadata-as-data，为 MetaServer 提供 SSTable 级批量 ingest，吸收 N-N checkpoint 与数据集导入的创建风暴。
+3. **批量导入与创建风暴**：借鉴 DeltaFS 的 metadata-as-data，为元数据服务提供 SSTable 级批量 ingest，吸收 N-N checkpoint 与数据集导入的创建风暴。
 4. **语义分级**：UnifyFS 的 lamination、HadaFS 的三级元数据同步说明：给作业私有数据提供弱一致快速通道 + 显式发布点，是 HPC/AI 场景的通用模式。
 5. **checkpoint 接口**：为上游 checkpoint 框架（ByteCheckpoint 类）提供并发分片写 + manifest 原子发布原语；保证追加写尾延迟稳定。
-6. **缓存边界**：训练感知缓存（Quiver/SHADE/SiloD/Fluid）应留在 SDK/缓存层与编排层，DFS 提供内容寻址友好的 Loc、hint API（预取/即将全量读）与 per-job 配额计量即可。
-7. **成本分层**：Tectonic-Shift 模式下，LightStore 的 EC+HDD 容量层之上应预留 flash 训练读加速层的位置。
+6. **缓存边界**：训练感知缓存（Quiver/SHADE/SiloD/Fluid）应留在 SDK/缓存层与编排层，DFS 提供内容寻址友好的数据位置句柄、hint API（预取/即将全量读）与 per-job 配额计量即可。
+7. **成本分层**：Tectonic-Shift 模式下，EC+HDD 容量层之上应预留 flash 训练读加速层的位置。
 
 ---
 

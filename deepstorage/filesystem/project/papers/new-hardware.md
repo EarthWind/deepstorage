@@ -2,7 +2,7 @@
 
 > 调研日期：2026-08-15
 >
-> 范围说明：本文调研 2020 年（含）之后发表的、以新硬件（persistent memory / PM、RDMA、NVMe & NVMe-oF、SmartNIC / DPU、CXL）为核心设计目标的**分布式文件系统**论文。所有论文均经过网络检索逐篇核实（会议、年份、作者机构、内容），未经核实的信息标注"待确认"。纯 KV 存储类工作（如 FUSEE、ROLEX、Sherman、Clover 等 disaggregated-memory KV）不属于文件系统，已明确排除。每篇论文附对本仓库 LightStore（manager / metaserver / dataserver 架构，追加写 volume + Range 分片元数据）的启示。
+> 范围说明：本文调研 2020 年（含）之后发表的、以新硬件（persistent memory / PM、RDMA、NVMe & NVMe-oF、SmartNIC / DPU、CXL）为核心设计目标的**分布式文件系统**论文。所有论文均经过网络检索逐篇核实（会议、年份、作者机构、内容），未经核实的信息标注"待确认"。纯 KV 存储类工作（如 FUSEE、ROLEX、Sherman、Clover 等 disaggregated-memory KV）不属于文件系统，已明确排除。每篇论文附面向分布式文件系统设计者的设计启示。
 
 ---
 
@@ -65,9 +65,9 @@
 
 - 强依赖 Optane PMem（已停产）；客户端本地放持久数据改变了运维模型（客户端节点故障=数据副本故障）；用户态 libfs + 共享内核态 kernfs 的架构侵入性强，POSIX 兼容与多进程共享复杂。
 
-### 对 LightStore 的启示
+### 设计启示
 
-- "操作粒度一致性 + 客户端本地持久日志"思路可用于 LightStore 客户端 SDK 的写路径：客户端先写本地持久 WAL（NVMe/电容 DRAM），后台再推给 dataserver，可把小写延迟从网络往返降为本地持久化延迟——但需承担客户端故障域的复杂性，与 LightStore"客户端无状态"的现有假设冲突，适合作为可选的强化写缓冲模式。
+- "操作粒度一致性 + 客户端本地持久日志"思路可用于客户端 SDK 的写路径：客户端先写本地持久 WAL（NVMe/电容 DRAM），后台再推给存储节点，可把小写延迟从网络往返降为本地持久化延迟——但需承担客户端故障域的复杂性，与多数 DFS"客户端无状态"的假设冲突，适合作为可选的强化写缓冲模式。
 - 分层本地性（process/socket/client-local）对读缓存层次设计有直接参考价值。
 
 ---
@@ -94,10 +94,10 @@
 
 - hash 分布 + 单一目录服务器的元数据设计扩展性有限（非其研究重点）；无副本容错的完整故事（扩展版才补充复制）；Optane 停产同样影响复现。
 
-### 对 LightStore 的启示
+### 设计启示
 
-- "大 IO 单边 RDMA 直达、元数据小 RPC 双边"的路径分化可直接映射到 LightStore：dataserver 的 volume 追加/读取走 RDMA 单边或 RDMA-based RPC 零拷贝，metaserver 的 Range 操作保持小消息 RPC。
-- client-active 负载转移思想与 LightStore "客户端直连 dataserver、Manager 不在 IO 路径"的原则一致，可进一步把 EC 编码、CRC 计算放在客户端。
+- "大 IO 单边 RDMA 直达、元数据小 RPC 双边"的路径分化可直接借鉴：存储节点的大块追加/读取走 RDMA 单边或 RDMA-based RPC 零拷贝，元数据操作保持小消息 RPC。
+- client-active 负载转移思想与"客户端直连存储节点、控制面不在 IO 路径"的分离式架构原则一致，可进一步把 EC 编码、CRC 计算放在客户端。
 
 ---
 
@@ -123,10 +123,10 @@
 
 - 依赖 PM（停产）与特定代 BlueField（BlueField-1/2，ARM 核数与 DMA 带宽制约划分策略）；流水线划分是手工设计，通用性/可移植性有限；host-NIC 通信通道本身有开销。
 
-### 对 LightStore 的启示
+### 设计启示
 
-- LightStore dataserver 的后台任务（EC 编码、compaction、修复扫描、CRC、压缩）天然适合 DPU offload；即使不用 DPU，"把后台任务与前台 IO 隔离到不同核组 + 流水线化"也是可落地的软件结构。
-- "NIC 侧保留最小服务能力以提升故障期可用性"对 LightStore 的优雅降级设计（主机 hang 但盘可读）有参考价值。
+- 存储节点的后台任务（EC 编码、compaction、修复扫描、CRC、压缩）天然适合 DPU offload；即使不用 DPU，"把后台任务与前台 IO 隔离到不同核组 + 流水线化"也是可落地的软件结构。
+- "NIC 侧保留最小服务能力以提升故障期可用性"对优雅降级设计（主机 hang 但盘可读）有参考价值。
 
 ---
 
@@ -151,10 +151,10 @@
 
 - DPU ARM 核性能有限，元数据密集 workload 受制于 DPU 侧处理能力；依赖 BlueField 的 virtio-fs emulation SDK（闭源组件）；FUSE 协议语义成为能力上限。
 
-### 对 LightStore 的启示
+### 设计启示
 
-- LightStore 计划"C++ SDK 之上封装 FUSE 接入层"——DPFS 展示了第二条路：**把 LightStore 客户端 SDK 整体跑在 DPU 上，主机以 virtio-fs 消费**，对不可改造的租户（VM、裸金属）尤其有价值，且客户端缓存/连接池由运营方统一管理。
-- 若走此路线，SDK 需为 ARM + 低单核性能环境优化（无锁、批处理、少拷贝），并保持 FUSE 请求粒度与 LightStore extent/Loc 模型的高效映射。
+- 对于"原生 SDK 之上封装 FUSE 接入层"的常见客户端路线，DPFS 展示了第二条路：**把客户端 SDK 整体跑在 DPU 上，主机以 virtio-fs 消费**，对不可改造的租户（VM、裸金属）尤其有价值，且客户端缓存/连接池由运营方统一管理。
+- 若走此路线，SDK 需为 ARM + 低单核性能环境优化（无锁、批处理、少拷贝），并保持 FUSE 请求粒度与系统内部数据定位模型的高效映射。
 
 ---
 
@@ -180,10 +180,10 @@
 
 - 深度绑定阿里自研 DPU 与盘古基础设施，学术复现不可行；网关引入一跳转发（用聚合与调度收益换取），对极致延迟场景需 bypass 路径。
 
-### 对 LightStore 的启示
+### 设计启示
 
-- 与 LightStore 关系最直接的工业论文：**"轻客户端 + 无状态网关"是 LightStore 支撑容器高密度接入的现成蓝图**——SDK 保持直连 dataserver 的高性能路径，同时提供经网关的轻量路径供海量小租户复用连接与缓存。
-- virtio 设备抽象 + 物理域/虚拟域分离的安全模型，是 LightStore 未来支持多租户云环境时 cookie/Loc 越权防护的自然延伸。
+- **"轻客户端 + 无状态网关"是支撑容器高密度接入的现成蓝图**——SDK 保持直连存储节点的高性能路径，同时提供经网关的轻量路径供海量小租户复用连接与缓存。
+- virtio 设备抽象 + 物理域/虚拟域分离的安全模型，是支持多租户云环境时数据访问凭证越权防护的自然延伸。
 
 ---
 
@@ -208,12 +208,12 @@
 
 ### 局限
 
-- 单服务器容量/吞吐终有上限（论文自身定位）；PM 停产后"十亿文件放单机字节寻址介质"的前提削弱；LightStore 目标是 10^12-10^13 文件，单 MDS 路线不适用，但可用于加速单个分片。
+- 单服务器容量/吞吐终有上限（论文自身定位）；PM 停产后"十亿文件放单机字节寻址介质"的前提削弱；对目标规模远超十亿文件的系统，单 MDS 路线不适用，但其技术可用于加速单个分片。
 
-### 对 LightStore 的启示
+### 设计启示
 
-- LightStore 的 metaserver 是"数千 Range Raft 组"——SingularFS 的价值在于**把每个 Range/每台 metaserver 的单机性能做深**：无日志原子元数据更新、目录热点的原子指令化、层级化并发控制，都可以在 RocksDB/自研引擎之上或之下借鉴，减少 Raft 组数量需求。
-- 也提示一个架构问题：若单分片性能足够高，Range 分裂阈值可以大幅提高，降低路由表规模与迁移频率。
+- 对采用分片 + 多 Raft 组元数据的系统，SingularFS 的价值在于**把每个分片/每台元数据服务器的单机性能做深**：无日志原子元数据更新、目录热点的原子指令化、层级化并发控制，都可以在 RocksDB/自研引擎之上或之下借鉴，减少分片（Raft 组）数量需求。
+- 也提示一个架构问题：若单分片性能足够高，分片分裂阈值可以大幅提高，降低路由表规模与迁移频率。
 
 ---
 
@@ -240,10 +240,10 @@
 
 - 架构为 Optane 设计，Metadata-on-SSD 属"移植适配"，WAL+checkpoint 引入了 PM 时代不存在的写放大与恢复复杂度；POSIX 层是对象模型上的适配层，语义/兼容性弱于原生内核文件系统；部署复杂。
 
-### 对 LightStore 的启示
+### 设计启示
 
-- **按 IO 尺寸/类型分介质**与 LightStore 高度契合：metaserver 的 Raft log 与热点元数据可走"电容 DRAM/低延迟 SSD WAL + checkpoint"（正是 DAOS Beyond-PM 的结构）；dataserver 大块追加写走普通 NVMe 的顺序带宽。
-- 用户态 IO 栈（SPDK）+ 每盘单线程 shared-nothing 引擎是 dataserver 达成 TB/s 级聚合带宽的成熟路线；DAOS 证明了该路线在万级盘规模的可运维性。
+- **按 IO 尺寸/类型分介质**是通用原则：元数据服务的复制日志与热点元数据可走"电容 DRAM/低延迟 SSD WAL + checkpoint"（正是 DAOS Beyond-PM 的结构）；存储节点大块追加写走普通 NVMe 的顺序带宽。
+- 用户态 IO 栈（SPDK）+ 每盘单线程 shared-nothing 引擎是存储节点达成 TB/s 级聚合带宽的成熟路线；DAOS 证明了该路线在万级盘规模的可运维性。
 
 ---
 
@@ -269,10 +269,10 @@
 
 - 多主机共享 CXL 内存硬件（CXL switch + MHSLD）2026 年仍处早期，多数验证在模拟/单机环境；单 Master、只读从节点的模型远弱于通用 DFS；跨主机缓存一致性依赖软件约定（写者 flush、读者失效）。
 
-### 对 LightStore 的启示
+### 设计启示
 
-- 短期非竞品，长期是信号：**当 CXL 共享内存池成熟，"热数据层"可能不再经过网络**。LightStore 的分层设计（volume 冷热分层）可预留"CXL 共享内存 volume"介质类型的抽象位。
-- famfs 的"append-only 元数据日志 + 从节点重放"与 LightStore 的追加写理念同构，是极小信任面下做共享的一个可借鉴模式。
+- 短期非竞品，长期是信号：**当 CXL 共享内存池成熟，"热数据层"可能不再经过网络**。冷热分层设计可预留"CXL 共享内存"介质类型的抽象位。
+- famfs 的"append-only 元数据日志 + 从节点重放"与追加写存储的理念同构，是极小信任面下做共享的一个可借鉴模式。
 
 ---
 
@@ -286,7 +286,7 @@
 ### 核心设计
 
 - 面向 AI 训练/推理 IO 特征（海量并发随机读、checkpoint 大写、KVCache）：
-  - **分离式架构**：cluster manager + 元数据服务（无状态，元数据存 FoundationDB 事务型 KV）+ 存储服务（chunk 引擎）+ 客户端（FUSE 及原生 API）。与 LightStore 的 manager/metaserver/dataserver 三分法高度同构。
+  - **分离式架构**：cluster manager + 元数据服务（无状态，元数据存 FoundationDB 事务型 KV）+ 存储服务（chunk 引擎）+ 客户端（FUSE 及原生 API）。
   - **数据路径**：RDMA 优先、零拷贝、kernel bypass；链式复制 CRAQ（Chain Replication with Apportioned Queries）提供强一致读写分流——写走链头到链尾，读可打到任意副本。
   - **放弃读缓存**：认为 AI 随机读命中率低，直接压榨全盘随机读 IOPS/带宽，简化一致性。
 - FUSE 之外提供绕过 FUSE 瓶颈的原生客户端 API（USRBIO）。
@@ -299,18 +299,18 @@
 
 - 非同行评审，数字为厂商自报；元数据依赖 FoundationDB 的事务吞吐上限；CRAQ 在写热点下链尾延迟放大；POSIX 语义裁剪（面向 AI 场景取舍）。
 
-### 对 LightStore 的启示
+### 设计启示
 
-- 架构同构性使其成为 LightStore 最直接的开源对标物。差异点值得研究：3FS 用"通用事务 KV（FoundationDB）承载元数据"换开发速度，LightStore 用"自研 Range multi-raft"换极限规模与可控性——3FS 的实践检验了前者在数千客户端下的可行性边界。
-- CRAQ 的"任意副本可读"与 LightStore 追加写 volume（sealed 后天然任意副本可读）互补：LightStore 可在 OPEN volume 上借鉴 CRAQ 读分流。
-- "为 AI 场景砍读缓存"提醒 LightStore：缓存策略应按 workload 画像可配置，而非固定设计。
+- 3FS 是分离式架构最直接的开源对标物。一个值得研究的分岔：用"通用事务 KV（FoundationDB）承载元数据"换开发速度，还是用"自研分片 multi-raft 元数据"换极限规模与可控性——3FS 的实践检验了前者在数千客户端下的可行性边界。
+- CRAQ 的"任意副本可读"与追加写、密封后只读的数据布局互补：密封后的数据天然任意副本可读，仍在写入中的数据可借鉴 CRAQ 读分流。
+- "为 AI 场景砍读缓存"提醒设计者：缓存策略应按 workload 画像可配置，而非固定设计。
 
 ---
 
 ## 11. 其他相关工作（简述）
 
 - **DPC: DPU-accelerated High-Performance File System Client**（ICPP 2024，Best Paper 提名；Kan Zhong 等，重庆大学/相关团队与厂商合作）：把分布式文件系统客户端卸载到 DPU，主机经共享内存环与 DPU 协作，兼顾吞吐与主机 CPU 释放。DPFS 路线的延续，验证了国产化场景下 DPU 客户端 offload 的可行性。链接：https://dl.acm.org/doi/10.1145/3673038.3673123
-- **SwitchFS: Asynchronous Metadata Updates for Distributed Filesystems with In-Network Coordination**（EuroSys 2026；Jingwei Xu、Mingkai Dong、Haibo Chen 等，上海交大 IPADS）：用可编程交换机（属广义"新硬件"）在网内跟踪目录状态，实现异步元数据更新——操作提前返回、目录更新推迟到读取时结算，同时隐藏延迟并摊薄开销。对 LightStore metaserver 的目录热点（大目录并发 create）是一条激进但有启发的思路。链接：https://dl.acm.org/doi/10.1145/3767295.3769349 ；arXiv:2410.08618（前身名 AsyncFS）
+- **SwitchFS: Asynchronous Metadata Updates for Distributed Filesystems with In-Network Coordination**（EuroSys 2026；Jingwei Xu、Mingkai Dong、Haibo Chen 等，上海交大 IPADS）：用可编程交换机（属广义"新硬件"）在网内跟踪目录状态，实现异步元数据更新——操作提前返回、目录更新推迟到读取时结算，同时隐藏延迟并摊薄开销。对元数据服务的目录热点（大目录并发 create）是一条激进但有启发的思路。链接：https://dl.acm.org/doi/10.1145/3767295.3769349 ；arXiv:2410.08618（前身名 AsyncFS）
 - **HiDPU**（FAST 2025）：面向分列式（disaggregated）存储的 DPU 侧混合索引方案，非完整文件系统，但代表 DPU 内存受限环境下索引结构的设计功力（细节待确认）。
 - **DPC: A Distributed Page Cache over CXL**（arXiv 2026，preprint，待确认录用情况）：基于 CXL 共享内存构建跨主机分布式 page cache，对比 VirtioFS/NFS/JuiceFS——CXL 与文件访问栈结合的早期学术信号。
 - **TeRM: Extending RDMA-Attached Memory with SSD**（FAST 2024，清华）：非文件系统，但其"RDMA 可注册内存扩展到 SSD"的机制对 RDMA DFS 的内存管理有支撑意义。
@@ -338,10 +338,10 @@
 
 ---
 
-## 13. 对 LightStore 的总体结论
+## 13. 总体结论
 
-1. **PM 一代论文（Assise/Octopus+/LineFS/SingularFS）的硬件已死、软件遗产仍活**：操作粒度一致性、无日志原子元数据更新、客户端持久写缓冲，应以"低延迟 NVMe + 电容 DRAM"为替身吸收进 metaserver 与 SDK 设计，不应直接押注 PM。
-2. **RDMA 是当下确定性最高的投入**：大 IO 单边直达 dataserver、小消息 RPC 元数据路径、客户端承担编码计算（client-active），三者与 LightStore 现有架构零冲突，收益已被 Octopus+/DAOS/3FS 反复验证。
+1. **PM 一代论文（Assise/Octopus+/LineFS/SingularFS）的硬件已死、软件遗产仍活**：操作粒度一致性、无日志原子元数据更新、客户端持久写缓冲，应以"低延迟 NVMe + 电容 DRAM"为替身吸收进元数据服务与 SDK 设计，不应直接押注 PM。
+2. **RDMA 是当下确定性最高的投入**：大 IO 单边直达存储节点、小消息 RPC 元数据路径、客户端承担编码计算（client-active），三者与"客户端直连存储节点、控制面不在 IO 路径"的分离式架构零冲突，收益已被 Octopus+/DAOS/3FS 反复验证。
 3. **DPU 有两条渐进路线**：先做 LineFS 式后台任务隔离（纯软件即可开工），再评估 DPFS/Fisc 式 virtio-fs 客户端 offload（面向多租户云形态）。
-4. **CXL 关注但不押注**：为 volume 层预留"共享内存介质"抽象；跟踪 famfs 与 CXL 3.x 硬件进展即可。
-5. **3FS 是最值得逐行对读的开源系统**：与 LightStore 三组件架构同构，其 FoundationDB 元数据与 CRAQ 复制的取舍，恰好是 LightStore 自研 multi-raft + 追加写 volume 路线的对照实验。
+4. **CXL 关注但不押注**：为存储介质层预留"共享内存介质"抽象；跟踪 famfs 与 CXL 3.x 硬件进展即可。
+5. **3FS 是最值得逐行对读的开源系统**：其 FoundationDB 元数据与 CRAQ 复制的取舍，恰好是"自研 multi-raft 元数据 + 追加写数据布局"路线的对照实验。

@@ -41,9 +41,9 @@ type metaPartition struct {
 按每 inode 百字节量级估算，单 MP 内存占用在数百 MB 级。要支撑万亿文件
 需要数十万个 MP，而每个 MP 是一个独立 Raft 组——Raft 组数量会先爆掉。
 
-对照 LightStore 的设计目标（10^12~10^13 文件），这条路走不通。
-LightStore 选择 Range 分片 + 单分片体积有界 + 数据落盘（而非全内存），
-方向是对的，本次调研反过来印证了这一点。
+对于万亿级文件的目标，这条路走不通。要突破这个约束，元数据服务需要
+"单分片体积有界 + 数据落盘（LSM 类引擎、增量刷盘）"而非全内存——
+这是 CubeFS 这个设计反向给出的启示。
 
 ## 2. 核心数据结构
 
@@ -124,12 +124,11 @@ func (se *SortedExtents) Append(ek proto.ExtentKey) (deleteExtents []proto.Exten
 被覆盖的 extent 通过返回值 `deleteExtents` 交给 `extDelCh` 通道，
 由后台批量投递给 DataNode 执行真正的删除。
 
-**这是一个值得 LightStore 认真权衡的分歧点**：
+**这是设计 extent 索引时必须明确站队的分歧点**：
 - JuiceFS 路线（追加 + 读时展开 + compaction）：写快、读慢、需要碎片治理
 - CubeFS 路线（写时替换）：写慢一点、读快、无需 compaction、GC 路径简单
 
-LightStore 的 README 描述的是"extent 索引按区间替换旧项"，即 CubeFS 路线。
-详见 [分析文档](cubefs-analysis.md) 第 2.1 节的评估。
+详见 [分析文档](cubefs-analysis.md) 第 5 节的评估。
 
 ## 3. 分片策略：inode ID 区间（这是个教训）
 
@@ -168,17 +167,18 @@ func (mw *MetaWrapper) Lookup_ll(parentID uint64, name string) (...) {
 （`metanode/transaction.go`，1593 行，含 `TransactionProcessor`、
 回滚记录 `TxRbInode` / `TxRbDentry`、事务超时清理）。
 
-### 对照 LightStore
+### 另一条路：key 范围分片 + 目录局部性
 
-LightStore 选的是 **key 范围分片 + 目录局部性**（"一个目录的全部 dentry 在 key 空间连续"，
-且"子 inode 尽量与父目录同 Range"）。这直接规避了 CubeFS 的两个问题：
+另一种分片方式是 **key 范围分片 + 目录局部性**：以 `(parent_inode, name)` 一类的 key
+做范围切分，让一个目录的全部 dentry 在 key 空间连续，并让子 inode 尽量与父目录
+落在同一个分片。这直接规避了 CubeFS 的两个问题：
 
-- lookup 与 getattr 大概率落在同一个 Range → 一次 RPC
-- create 的 dentry 与 inode 同 Range → 单 Raft 组事务，不需要分布式事务
+- lookup 与 getattr 大概率落在同一个分片 → 一次 RPC
+- create 的 dentry 与 inode 同分片 → 单 Raft 组事务，不需要分布式事务
 
-**这是本次调研中 LightStore 相对 CubeFS 最明确的架构优势。**
-但要注意 LightStore 说的是"尽量同 Range"——当目录跨 Range（十亿级大目录）
-或 inode 段耗尽时仍会退化，跨 Range 事务的路径必须存在且被测试到。
+**这是设计新元数据服务时相对 CubeFS 路线最明确的改进空间。**
+但要注意"尽量同分片"总有退化路径——当目录跨分片（十亿级大目录）
+或分片内 inode 段耗尽时仍会退化为跨分片操作，跨分片事务的路径必须存在且被测试到。
 CubeFS 的 `transaction.go` 可以作为实现参考（它是被逼出来的，但实现是完整的）。
 
 ## 4. Raft 层
@@ -207,7 +207,7 @@ func (s *MetaItem) MarshalJson() ([]byte, error) { return json.Marshal(s) }
    二进制载荷膨胀 4/3
 2. 每次 apply 反序列化，走反射路径
 
-在元数据密集负载下这是笔实打实的开销。**LightStore 的 Raft 日志务必用紧凑二进制编码**，
+在元数据密集负载下这是笔实打实的开销。**Raft 日志务必用紧凑二进制编码**——
 这看起来很基础，但 CubeFS 这样成熟的项目仍留着这条路径，说明它很容易被忽略。
 
 ## 5. 删除与空间回收
@@ -239,7 +239,7 @@ mp.deleteMarkedInodes(buffSlice)
 **关键优势：不需要全局扫描。** 每个 extent 的归属（哪个 DP、哪个 extent）
 在 ExtentKey 里是明确的，删除是点对点的定向操作。
 对比 JuiceFS 必须靠 `juicefs gc` 全量扫描对象存储比对引用，
-CubeFS 这条路径在大规模下明显更健康——这也是 LightStore 应该走的方向。
+CubeFS 这条路径在大规模下明显更健康，是值得沿用的方向。
 
 代价是**必须保证删除消息不丢**：MetaNode 崩溃时未下发的删除会变成孤儿 extent。
 CubeFS 靠 delete-extent 文件持久化 + 重启重放来兜底。

@@ -181,19 +181,19 @@ unlink 的 namespace 成功点和物理空间回收分开：
 
 提高 purge 并发会把压力转移到 OSD/PG，不是免费加速；应在前台 SLO、recovery/scrub 与容量水位之间限速。
 
-## 12. 对 LightStore data plane 的启示
+## 12. 数据面设计启示
 
-### 值得吸收
+### 可借鉴的机制
 
-1. SDK 获得完整 Location/placement/epoch 后直连 DataServer，避免每个 record 查中心 map。
+1. 客户端获得完整 location/placement/epoch 后直连数据节点，避免每个 record 查中心 map。
 2. layout/pool policy 采用目录/租户级继承，但文件创建后固定，变更走显式 migration。
 3. checksum、failure domain、replica/EC generation 和 repair 都成为持久协议字段。
 4. namespace delete 与物理 reclaim 分离，并把 backlog/估算 bytes 做成一等指标。
 5. 提供类似 backtrace 的反向恢复线索，但不依赖全池 scan 作为主要 RTO。
 
-### 保留差异
+### 面向海量小文件时可采取的不同取舍
 
-1. 继续使用 append-only volume packing，避免每个小记录一个物理对象。
-2. Location 使用 `volume_id + offset + length + generation/checksum`，GC 后用原子/epoch 化重定向。
+1. 采用 append-only 打包（把许多小记录聚合进大的顺序 volume/segment），避免每个小记录一个物理对象。
+2. 定位信息使用 `volume_id + offset + length + generation/checksum` 一类的紧凑 location，GC 后用原子/epoch 化重定向。
 3. EC 以大 volume/segment 为单位形成完整 stripe，减少小文件 partial-stripe 写放大。
 4. 对逻辑/物理/可回收/快照占用分别计量，避免 `du` 一类近似值成为计费事实源。

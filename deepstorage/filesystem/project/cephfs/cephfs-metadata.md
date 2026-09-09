@@ -158,19 +158,19 @@ v20.2.3 源码默认 `mds_bal_split_size=10000`，`mds_bal_merge_size=50`，frag
 | 大目录完整 list 慢 | 全 fragment 聚合、客户端排序/stat | 无法根治 |
 | journal trim lag | backing RADOS 慢、dirty state pinned | 增 rank 不是直接解法 |
 
-## 10. 对 LightStore metadata 的启示
+## 10. 元数据设计启示
 
-### 值得吸收
+### 可借鉴的机制
 
-1. Range owner 与 durable replica 概念分离，但 authority 迁移必须有 journal/epoch 证据。
+1. metadata shard 的 owner（authority）与 durable replica 概念分离，但 authority 迁移必须有 journal/epoch 证据。
 2. 超大目录必须允许目录内 hash/range split；完整 listing 需要可恢复 cursor 和明确 snapshot 语义。
 3. 把 cache delegation 视为 capability，带版本、可撤销、超时与 fencing，而不是无限 TTL。
 4. 设计显式 recovery state machine，不只提供“leader 重新选出”一个状态。
 5. 为每个 metadata shard 保存 damage table、scrub 进度和可离线解析的物理格式。
 
-### 不应照搬
+### 应规避的设计
 
-1. LightStore 已用 Range Raft，不应降级为 MDS journal + 单 authority failover；应保留多数派持久化与确定的 leader epoch。
+1. “单 authority + shared backing store + replay failover”与“每个 metadata shard 多数派复制”是两条不同路线；已选择后者的系统不应退回 MDS journal + 单 authority failover 的混合形态，应保留多数派持久化与确定的 leader epoch。
 2. 不应让万亿小文件性能依赖单机内存覆盖 metadata working set。
-3. 不应把跨 Range 正确性隐藏在隐式 forwarding；需要 operation ID、intent、幂等与 reconciliation。
-4. 避免把每个记录映射为独立底层对象，保留 append-only volume packing 的空间和恢复优势。
+3. 不应把跨 shard 正确性隐藏在隐式 forwarding；需要 operation ID、intent、幂等与 reconciliation。
+4. 面向海量小记录时，避免把每个记录映射为独立底层对象；append-only 打包存储在空间和恢复范围上更有优势。

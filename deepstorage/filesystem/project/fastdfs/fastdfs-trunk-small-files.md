@@ -237,4 +237,4 @@ FastDFS file ID 直接编码 group/path/trunk offset，后续搬迁难以保持 
 
 trunk 是 FastDFS 最有价值也最需要纪律的扩展。对于稳定、不可变、大小分布集中在 KB—数百 KB 的对象，它能显著降低 inode 和目录元数据成本；对于高删除、高覆盖、要求自动 compaction/EC/跨组迁移的工作负载，它会暴露 allocator、碎片和位置固化问题。
 
-采用决策应以真实对象分布和故障测试为依据，并把“开启不可轻易回退”写入变更审批。若 LightStore 的目标是 10^12—10^13 文件，值得借鉴的是 packing 方向和简洁 header，而不是把 trunk server 与物理 offset 直接固化进长期对象 ID。
+采用决策应以真实对象分布和故障测试为依据，并把“开启不可轻易回退”写入变更审批。对于以万亿级小文件为目标的新系统，值得借鉴的是 packing 方向和简洁 header，而不是把 trunk server 与物理 offset 直接固化进长期对象 ID。

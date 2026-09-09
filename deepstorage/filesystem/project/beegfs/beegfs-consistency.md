@@ -296,14 +296,14 @@ BeeGFS 依赖 management 所在分区形成唯一可继续服务的系统视图�
 
 任何一致性增强都可能降低性能；任何性能调优都可能扩大陈旧/丢失窗口。应以应用 invariant 和故障测试决定，而非复制通用模板。
 
-## 14. 对 LightStore 的建议
+## 14. 设计启示
 
-1. 在 SDK API 文档中把 **visibility、ordering、atomicity、durability、failure recovery** 分成五个契约，不用“强一致”一词代替全部。
+1. 在客户端/SDK API 文档中把 **visibility、ordering、atomicity、durability、failure recovery** 分成五个契约，不用“强一致”一词代替全部。
 2. 全局锁/append 若不是产品目标，应明确返回不支持或提供独立原子 append API，避免 BeeGFS 式“syscall 成功但默认仅本地”的惊讶。
-3. Metadata 的 Range/Raft 已提供线性化基础；跨 Range 操作仍需定义 transaction/intent/compensation 和 fsck，不应假设 Raft 自动解决跨组原子性。
-4. DataServer 写 ACK、replica ACK、EC commit、volume fsync 和 device flush 应有可观测 commit stage，用户可选择 durability level。
+3. 即使元数据分片使用 Raft 等共识协议提供线性化基础，跨分片操作仍需定义 transaction/intent/compensation 和 fsck，不应假设共识协议自动解决跨组原子性。
+4. 数据服务写 ACK、replica ACK、EC commit、volume fsync 和 device flush 应有可观测 commit stage，用户可选择 durability level。
 5. 缓存 invalidation 若引入，必须有 epoch/overflow 后全量失效和有界 staleness；不要发布带已知 lost-invalidation race 的“强一致 cache”。
-6. 为异步 GC/compaction 的 Location 增加 generation/version，与 BeeGFS storage version 拒绝乱序动态属性的思路一致。
+6. 为异步 GC/compaction 涉及的数据位置增加 generation/version，与 BeeGFS storage version 拒绝乱序动态属性的思路一致。
 
 ## 15. 必做一致性测试
 

@@ -2,7 +2,7 @@
 
 > 调研日期：2026-08-15
 >
-> 范围说明：本调研聚焦 2020 年（含）之后发表的、来自工业界大规模生产环境的分布式文件系统（DFS）论文，覆盖 Meta（Facebook）、Alibaba、Baidu、DeepSeek、Huawei 等公司的系统，以及 Google Colossus（无正式论文，仅官方博客/演讲，已明确标注）。每篇论文均通过 Web 搜索逐一核实了真实性、会议归属与年份；与常见传言不符之处（如 Tectonic-Shift、Fisc 的实际会议）已在文中更正说明。文末给出对本仓库 LightStore 项目（C++ 实现，manager / metaserver / dataserver 三组件架构）的启示汇总。
+> 范围说明：本调研聚焦 2020 年（含）之后发表的、来自工业界大规模生产环境的分布式文件系统（DFS）论文，覆盖 Meta（Facebook）、Alibaba、Baidu、DeepSeek、Huawei 等公司的系统，以及 Google Colossus（无正式论文，仅官方博客/演讲，已明确标注）。每篇论文均通过 Web 搜索逐一核实了真实性、会议归属与年份；与常见传言不符之处（如 Tectonic-Shift、Fisc 的实际会议）已在文中更正说明。文末给出面向分布式文件系统设计者的总体设计启示汇总。
 >
 > 注意：调研过程中 USENIX 官网对自动抓取返回 403，论文摘要与细节综合自搜索引擎摘要、ACM DL、arXiv、官方博客与第三方技术分析文章；个别未能直接核实的细节已标注"待确认"。
 
@@ -18,7 +18,7 @@
 8. [Huawei FalconFS（NSDI 2026 / arXiv 2025）](#8-huawei-falconfs-nsdi-2026)
 9. [Google Colossus（非论文：官方博客）与 CacheSack（ATC 2022）](#9-google-colossus-与-cachesack)
 10. [其他相关工作简述](#10-其他相关工作简述)
-11. [对 LightStore 的总体启示](#11-对-lightstore-的总体启示)
+11. [总体设计启示](#11-总体设计启示)
 12. [汇总表](#12-汇总表)
 
 ---
@@ -50,12 +50,12 @@ Facebook 此前为不同业务维护多套专用存储系统（Haystack/f4 存 B
 - 单集群承载 **exabyte 级**数据、**数十亿文件**、数千存储节点，同时服务 Blob 与数仓两大类租户；
 - 整合后达到与原专用系统（Haystack、f4、HDFS 联邦）相当的性能，同时显著提升空间与 IO 资源利用率（原 HDFS 数仓需数十个联邦集群，Tectonic 用单集群承载）。
 
-### 对 LightStore 的启示
+### 设计启示
 
-- **元数据分层 + KV 化**是支撑超大规模命名空间的关键路径：LightStore 的 metaserver 可以借鉴"Name/File/Block 三层解耦、各自独立分片"的思路，把目录树、文件-块映射、块位置三类元数据分开组织，避免单体元数据服务成为瓶颈；
-- 元数据服务无状态化、状态下沉到带事务的 KV 引擎（如 RocksDB + Raft），能简化 metaserver 的故障恢复与水平扩展；
-- 客户端库承载 EC/副本策略与故障处理逻辑，可让 dataserver 保持简单；但要注意 Fisc 论文（见下）指出的胖客户端在云原生场景的资源与升级代价；
-- 明确放弃跨分片原子 rename 这类"语义换扩展性"的取舍值得在 LightStore 设计文档中显式决策。
+- **元数据分层 + KV 化**是支撑超大规模命名空间的关键路径：元数据服务可以借鉴"Name/File/Block 三层解耦、各自独立分片"的思路，把目录树、文件-块映射、块位置三类元数据分开组织，避免单体元数据服务成为瓶颈；
+- 元数据服务无状态化、状态下沉到带事务的 KV 引擎（如 RocksDB + Raft），能简化元数据服务的故障恢复与水平扩展；
+- 客户端库承载 EC/副本策略与故障处理逻辑，可让存储节点保持简单；但要注意 Fisc 论文（见下）指出的胖客户端在云原生场景的资源与升级代价；
+- 明确放弃跨分片原子 rename 这类"语义换扩展性"的取舍值得在设计文档中显式决策。
 
 ---
 
@@ -81,10 +81,10 @@ Meta 的 ML 训练（推荐模型为主）对训练数据存储提出了海量�
 - 应用感知缓存策略比传统 LRU flash 缓存多吸收 **1.51–3.28x** 的 IO；
 - 在 PB 级生产集群上使存储**功耗需求降低 29%**。
 
-### 对 LightStore 的启示
+### 设计启示
 
-- 若 LightStore 面向 AI 训练类负载，应考虑在 dataserver 之上/之内引入分层介质（NVMe 缓存 + HDD 容量层），并把"上层负载语义（数据集、epoch 访问模式）"作为缓存策略输入，而非只依赖通用 LRU；
-- "每瓦特带宽"是大规模生产环境的真实优化目标，容量规划工具（manager 可承担）应把功耗建模纳入。
+- 面向 AI 训练类负载的系统，应考虑在存储节点之上/之内引入分层介质（NVMe 缓存 + HDD 容量层），并把"上层负载语义（数据集、epoch 访问模式）"作为缓存策略输入，而非只依赖通用 LRU；
+- "每瓦特带宽"是大规模生产环境的真实优化目标，容量规划工具应把功耗建模纳入。
 
 ---
 
@@ -114,11 +114,11 @@ Pangu 是阿里统一存储底座（支撑 EBS、OSS、NAS、数据库、MaxComp
 - 生产环境达到 **100 µs 级平均 I/O 延迟**、毫秒级 P999，支撑阿里云 EBS/OSS 等核心业务；
 - 双十一等大促场景下的大规模验证；具体集群规模数字论文中有披露（如单集群万级节点，待确认精确值）。
 
-### 对 LightStore 的启示
+### 设计启示
 
-- **统一 append-only 持久层**是同时支撑多种上层语义（块/对象/文件）并简化 EC、SSD GC 友好性的经过验证的设计；LightStore dataserver 的存储引擎可采用 append-only chunk + 后台整理的模型；
-- 若追求极致延迟，dataserver 端 run-to-completion + 用户态 IO（io_uring/SPDK）与 RDMA/自研 RPC 是工业界共识路径；C++ 实现的 LightStore 具备走这条路的语言条件；
-- 前后台流量隔离（用户 IO vs 迁移/修复流量）应在 dataserver 与 manager 的调度中显式设计。
+- **统一 append-only 持久层**是同时支撑多种上层语义（块/对象/文件）并简化 EC、SSD GC 友好性的经过验证的设计；存储节点的存储引擎可采用 append-only chunk + 后台整理的模型；
+- 若追求极致延迟，存储节点端 run-to-completion + 用户态 IO（io_uring/SPDK）与 RDMA/自研 RPC 是工业界共识路径；
+- 前后台流量隔离（用户 IO vs 迁移/修复流量）应在存储节点与控制面的调度中显式设计。
 
 ---
 
@@ -145,9 +145,9 @@ Pangu 是阿里统一存储底座（支撑 EBS、OSS、NAS、数据库、MaxComp
 - 相比 on-premise Pangu 胖客户端，**CPU 消耗降低 69%、内存降低 20%**，可用性提升一个数量级；
 - 生产 DCN 部署 **3 年**，服务阿里 **300 万+ CPU 核**上的应用；在线搜索查询业务平均延迟 **< 500 µs**、P999 **< 60 ms**。
 
-### 对 LightStore 的启示
+### 设计启示
 
-- 胖客户端与瘦客户端是一个真实的架构分岔：LightStore 若目标场景含容器/多租户云环境，应尽早把"客户端逻辑放哪"作为一等设计问题——可行折中是：协议上支持胖客户端直连 dataserver，同时提供可选的接入代理层（类似 Fisc proxy）供云原生部署;
+- 胖客户端与瘦客户端是一个真实的架构分岔：若目标场景含容器/多租户云环境，应尽早把"客户端逻辑放哪"作为一等设计问题——可行折中是：协议上支持胖客户端直连存储节点，同时提供可选的接入代理层（类似 Fisc proxy）供云原生部署；
 - 客户端-服务端之间引入稳定的窄接口（类似 vRPC），可让客户端升级与服务端演进解耦；
 - 连接数管理（共享连接、空闲回收）在大规模集群是必须提前设计的工程问题。
 
@@ -175,10 +175,10 @@ Pangu 是阿里统一存储底座（支撑 EBS、OSS、NAS、数据库、MaxComp
 - 在 **Baidu AI Cloud 生产环境运行 3 年+**；
 - 50 节点集群评测：吞吐相对 HopsFS 提升 **1.76–75.82x**、相对 InfiniFS 提升 **1.22–4.10x**；平均延迟分别最多降低 91.71% / 54.54%；真实负载端到端吞吐提升 1.62–2.55x，尾延迟降低 35.06–62.47%。
 
-### 对 LightStore 的启示
+### 设计启示
 
-- metaserver 的核心难题不是"存多少元数据"而是"锁与事务范围"：设计元数据操作时应逐操作分析其最小临界区，把 rename/mkdir 等复合操作尽量收敛到单 shard 原子原语上；
-- "属性与命名空间分开分片"的思路可直接用于 LightStore：inode 属性表按 inode id 哈希分片，目录项表按目录分片，二者独立扩展；
+- 元数据服务的核心难题不是"存多少元数据"而是"锁与事务范围"：设计元数据操作时应逐操作分析其最小临界区，把 rename/mkdir 等复合操作尽量收敛到单 shard 原子原语上；
+- "属性与命名空间分开分片"的思路可直接复用：inode 属性表按 inode id 哈希分片，目录项表按目录分片，二者独立扩展；
 - 路径解析放客户端（带缓存与失效协议）可以砍掉一层转发延迟，但需要设计好缓存一致性协议。
 
 ---
@@ -204,9 +204,9 @@ Pangu 是阿里统一存储底座（支撑 EBS、OSS、NAS、数据库、MaxComp
 
 - 在最高 **1000 亿文件**的目录树上保持稳定的元数据延迟与吞吐，明显优于 HopsFS 等对比系统（后被 Baidu CFS 作为 baseline 进一步超越）。
 
-### 对 LightStore 的启示
+### 设计启示
 
-- 路径解析是元数据服务的第一性能瓶颈；LightStore metaserver 应避免"每级目录一次 RPC"的朴素实现，可结合目录 ID 可预测生成 + 客户端乐观缓存；
+- 路径解析是元数据服务的第一性能瓶颈；元数据服务应避免"每级目录一次 RPC"的朴素实现，可结合目录 ID 可预测生成 + 客户端乐观缓存；
 - 近根目录（/、/home 等）天然是读热点，需要专门的缓存/复制策略而非均匀分片。
 
 ---
@@ -246,11 +246,11 @@ Pangu 是阿里统一存储底座（支撑 EBS、OSS、NAS、数据库、MaxComp
 - GraySort：110.5 TiB 数据 8192 分区 30 分 14 秒排完，均值 3.66 TiB/min；
 - KVCache 读峰值 **40 GiB/s**。
 
-### 对 LightStore 的启示
+### 设计启示
 
-- 3FS 与 LightStore 的组件划分高度同构（cluster manager ↔ manager，metadata service ↔ metaserver，storage service ↔ dataserver），是极佳的对标参考实现（C++，代码开源）；
-- "元数据下沉到事务 KV（FoundationDB）+ 无状态元数据服务"再次得到验证（与 Tectonic/ZippyDB 同构）；LightStore metaserver 可考虑架在嵌入式事务 KV + Raft 之上，而不是自造持久化格式；
-- **CRAQ 是副本一致性协议的务实选择**：比 Raft-per-chunk 简单，读扩展性好，适合读多写少的 AI 负载；LightStore dataserver 的副本协议选型可将 chain replication/CRAQ 与 Raft、主从复制一起纳入评估；
+- 3FS 的 cluster manager / metadata service / storage service / client 四组件划分是分离式架构的典型形态，且 C++ 代码开源，是极佳的对标参考实现；
+- "元数据下沉到事务 KV（FoundationDB）+ 无状态元数据服务"再次得到验证（与 Tectonic/ZippyDB 同构）；新系统的元数据服务可考虑架在嵌入式事务 KV + Raft 之上，而不是自造持久化格式；
+- **CRAQ 是副本一致性协议的务实选择**：比 Raft-per-chunk 简单，读扩展性好，适合读多写少的 AI 负载；存储节点的副本协议选型可将 chain replication/CRAQ 与 Raft、主从复制一起纳入评估；
 - 面向 AI 场景的增值特性（随机读 dataloader、并行 checkpoint、KVCache）说明 DFS 的竞争力越来越取决于"贴负载"的上层能力。
 
 ---
@@ -277,10 +277,10 @@ Pangu 是阿里统一存储底座（支撑 EBS、OSS、NAS、数据库、MaxComp
 - 对比 CephFS 与 Lustre：小文件读写吞吐最高 **5.72x**，深度学习模型训练吞吐最高 **12.81x**；
 - 已在**华为自动驾驶系统生产环境**运行一年，规模 **1 万 NPU**，并已开源。
 
-### 对 LightStore 的启示
+### 设计启示
 
-- 与 InfiniFS/CFS 的"客户端缓存路径解析"路线相反，FalconFS 证明在 DL 小文件负载下"服务端解析 + 无状态客户端"更优——说明**元数据缓存策略必须按目标负载选型**，LightStore 应先明确目标负载画像再定 metaserver 与客户端的职责边界；
-- 海量小文件是 AI 时代 DFS 的核心考题，dataserver 需要考虑小文件聚合存储（chunk 内打包）与元数据端优化联动。
+- 与 InfiniFS/CFS 的"客户端缓存路径解析"路线相反，FalconFS 证明在 DL 小文件负载下"服务端解析 + 无状态客户端"更优——说明**元数据缓存策略必须按目标负载选型**，应先明确目标负载画像再定元数据服务与客户端的职责边界；
+- 海量小文件是 AI 时代 DFS 的核心考题，数据面需要考虑小文件聚合存储（chunk 内打包）与元数据端优化联动。
 
 ---
 
@@ -310,11 +310,11 @@ Pangu 是阿里统一存储底座（支撑 EBS、OSS、NAS、数据库、MaxComp
 
 CacheSack 是 **Colossus Flash Cache**（Colossus 的通用 flash 缓存服务）的准入算法：把缓存流量划分为不相交类别，对每类评估缓存收益，将"给每类分配何种准入策略"建模为背包问题求最优解，目标是最小化 HDD 磁盘 IO 与 flash 损耗两大主导成本。生产结果：**TCO 降低 7.7%、磁盘读降低 9.5%、flash 磨损降低 17.8%**。这是 2020 年后少有的透露 Colossus 生产细节的同行评审论文。
 
-### 对 LightStore 的启示
+### 设计启示
 
-- Colossus 的 Curator/Custodian 分离印证了 LightStore 中 manager 角色的正确定位：**控制操作（元数据路径）与后台维护（均衡、修复）应是两类独立组件/进程**，避免后台任务干扰前台延迟；
+- Colossus 的 Curator/Custodian 分离印证了控制面角色的正确定位：**控制操作（元数据路径）与后台维护（均衡、修复）应是两类独立组件/进程**，避免后台任务干扰前台延迟；
 - "元数据存到另一个可扩展存储系统（BigTable）"与 Tectonic/3FS 的 KV 化殊途同归；
-- flash 缓存准入用"成本建模 + 优化求解"替代启发式，是 LightStore 未来做分层缓存时可借鉴的方法论。
+- flash 缓存准入用"成本建模 + 优化求解"替代启发式，是做分层缓存时可借鉴的方法论。
 
 ---
 
@@ -324,22 +324,22 @@ CacheSack 是 **Colossus Flash Cache**（Colossus 的通用 flash 缓存服务�
 
 - **What's the Story in EBS Glory: Evolutions and Lessons in Building Cloud Block Store**（Alibaba，FAST 2024）：阿里云 EBS 十年演进，构建于 Pangu 之上，讨论联邦 Pangu 集群、EC/压缩降流量放大等，与 Pangu 论文互补。链接：<https://dl.acm.org/doi/10.5555/3650697.3650714>（USENIX FAST 2024）。
 - **Discard-Based Garbage Collection for Distributed Log-Structured Storage Systems in ByteDance**（ByteDance，FAST 2026）：针对字节跳动基础存储层 ByteStore（分布式 append-only 存储）的 GC 方案 DisCoGC，TCO 降低约 20%。链接：<https://www.usenix.org/conference/fast26/presentation/bian>。说明字节的 DFS 底座（ByteStore）尚无整体架构论文，待确认后续是否发表。
-- **SingularFS: A Billion-Scale Distributed File System Using a Single Metadata Server**（清华，ATC 2023）：学术系统，用单元数据服务器支撑十亿级文件，可作为 metaserver 单机性能上限的参考。
+- **SingularFS: A Billion-Scale Distributed File System Using a Single Metadata Server**（清华，ATC 2023）：学术系统，用单元数据服务器支撑十亿级文件，可作为单机元数据服务性能上限的参考。
 - **腾讯**：未检索到 2020 年后来自腾讯大规模生产 DFS 的顶会论文（其开源 DFS 相关工作如 CubeFS 的论文《CFS: A Distributed File System for Large Scale Container Platforms》发表于 SIGMOD 2019，出自京东，且在 2020 年前）——**待确认**。
 - **Microsoft**：ADLS 论文（SIGMOD 2017）之后，未检索到微软 2020 年后发表的 DFS 整体架构后续论文（近年论文多集中于 blob/缓存/盘级研究）——**待确认**。
 
 ---
 
-## 11. 对 LightStore 的总体启示
+## 11. 总体设计启示
 
-结合上述论文，对 LightStore（C++；manager / metaserver / dataserver）的共性结论：
+结合上述论文，对分布式文件系统设计的共性结论：
 
-1. **元数据 KV 化 + 无状态服务层是主流共识**（Tectonic/ZippyDB、3FS/FoundationDB、Colossus/BigTable）：metaserver 建议实现为"无状态逻辑层 + 事务 KV 持久层（RocksDB + Raft 或嵌入 FoundationDB 类系统）"，天然获得水平扩展与快速故障恢复。
+1. **元数据 KV 化 + 无状态服务层是主流共识**（Tectonic/ZippyDB、3FS/FoundationDB、Colossus/BigTable）：元数据服务建议实现为"无状态逻辑层 + 事务 KV 持久层（RocksDB + Raft 或嵌入 FoundationDB 类系统）"，天然获得水平扩展与快速故障恢复。
 2. **路径解析与锁范围决定元数据性能上限**（CFS、InfiniFS、FalconFS）：按目标负载（通用 POSIX vs AI 小文件）选择客户端缓存解析或服务端解析路线；精简每个元数据操作的临界区。
-3. **数据面 append-only + EC 是成本与性能的公约数**（Pangu、Tectonic）：dataserver 存储引擎建议 append-only chunk 布局，EC 作为一等公民（冗余 1.2–1.5x），副本一致性协议可评估 CRAQ（3FS 路线）。
+3. **数据面 append-only + EC 是成本与性能的公约数**（Pangu、Tectonic）：存储节点的存储引擎建议 append-only chunk 布局，EC 作为一等公民（冗余 1.2–1.5x），副本一致性协议可评估 CRAQ（3FS 路线）。
 4. **胖/瘦客户端要按部署形态显式选型**（Fisc vs Tectonic）：裸金属/专属集群用胖客户端直连；云原生容器场景准备代理/网关层。
-5. **控制面职责拆分**（Colossus Curator/Custodian、Pangu master）：manager 应把"集群成员/放置决策"与"后台修复/均衡/GC"拆为独立模块，并对前后台流量做隔离与限流。
-6. **面向 AI 负载的增值能力成为差异化点**（Tectonic-Shift、3FS、FalconFS）：分层 flash 缓存 + 负载感知准入、随机读 dataloader、并行 checkpoint、KVCache 等值得列入 LightStore 路线图。
+5. **控制面职责拆分**（Colossus Curator/Custodian、Pangu master）：控制面应把"集群成员/放置决策"与"后台修复/均衡/GC"拆为独立模块，并对前后台流量做隔离与限流。
+6. **面向 AI 负载的增值能力成为差异化点**（Tectonic-Shift、3FS、FalconFS）：分层 flash 缓存 + 负载感知准入、随机读 dataloader、并行 checkpoint、KVCache 等值得列入新系统的路线图。
 
 ---
 

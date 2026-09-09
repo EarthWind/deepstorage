@@ -251,7 +251,7 @@ Rebalance 同时需要 source 和 destination 临时存在，且不能在 near-f
 - DHT/client inode cache；
 - create/lookup/stat 对多个 bricks 的 RPC。
 
-Gluster 不会为 1 KiB 文件预分配 64 MiB，但它仍是 **per-file native inode 模型**，与 LightStore 把许多小 records packing 到 volume 的模型完全不同。
+Gluster 不会为 1 KiB 文件预分配 64 MiB，但它仍是 **per-file native inode 模型**，与把许多小记录打包到大 volume 的模型（Haystack 式）完全不同。
 
 ### 7.2 大目录固定成本
 

@@ -103,7 +103,7 @@ BeeGFS 的“服务”和“目标”不能混为一谈：
 新建目录时，当前 metadata service 从可用 metadata capacity pool 和偏好列表中选择一个 owner；该目录的
 inode 和全部子项 dentry 由这个 owner 管理。子目录可以被放到另一服务，因此一棵宽而深的命名空间可自然分散。
 
-这不是 DNE striped directory 或 Range-sharded directory：
+这不是 DNE striped directory 或按 hash/range 分片的目录：
 
 - 同一目录内的文件名不会按 hash 分到多个 metadata services；
 - 单目录 create/unlink/readdir/rename 的并行上限受该 owner、它的 buddy 和底层目录限制；

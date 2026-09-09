@@ -102,7 +102,7 @@ sealed warm volume: one normal volume -> RS(10,4) -> 14 EC shards
 - [删除回收、Vacuum 与分层存储](seaweedfs-lifecycle-tiering.md)：tombstone、compaction、TTL、Cloud Tier 和容量窗口。
 - [高可用、恢复、生产运维与安全](seaweedfs-ha-operations-security.md)：拓扑、监控、升级、备份、故障处置和加固清单。
 - [性能模型、容量规划与 PoC](seaweedfs-performance.md)：瓶颈推导、官方数据边界、压测和故障注入矩阵。
-- [综合评估与采用建议](seaweedfs-analysis.md)：优缺点、场景评分、生产门槛和 LightStore 可借鉴机制。
+- [综合评估与采用建议](seaweedfs-analysis.md)：优缺点、场景评分、生产门槛和通用设计启示。
 - [资料来源与研究方法](sources.md)：版本、证据等级、源码锚点、限制和可复现说明。
 
 ## 场景判断
