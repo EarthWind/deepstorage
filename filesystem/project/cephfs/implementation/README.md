@@ -15,6 +15,7 @@
 | 3 | [客户端实现剖析](cephfs-impl-client.md) | libcephfs `Client`、内核 `fs/ceph`、caps 处理、ObjectCacher、Objecter、Striper、异步目录操作 | 客户端栈结构、caps 处理流程、Objecter 重发流程 |
 | 4 | [关键请求端到端流程](cephfs-impl-request-flows.md) | mount、lookup/open、create、write+fsync、read、rename（跨 rank）、unlink+purge、mksnap、MDS failover | 9 张端到端时序图 |
 | 5 | [持久化格式](cephfs-impl-on-disk-format.md) | metadata/data pool 对象命名、dirfrag omap 编码、journal 格式、backtrace、各类表 | 对象布局图、journal 格式图 |
+| 6 | [文件系统初始化流程](cephfs-impl-bootstrap.md) | 建池、MON `fs new`、rank 分配、`MDSRank::boot_create` 写出初始对象、多 rank 初始化 | 初始化时序图、boot_create 流程图 |
 
 ## 推荐的源码阅读顺序
 
