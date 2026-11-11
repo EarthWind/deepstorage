@@ -13,7 +13,7 @@ deepstorage/
     └── project/
         ├── 3fs/         DeepSeek 3FS（Fire-Flyer File System）
         ├── beegfs/      BeeGFS
-        ├── cephfs/      CephFS
+        ├── cephfs/      CephFS（另含 design/ 设计文档、implementation/ 实现文档）
         ├── cubefs/      CubeFS
         ├── fastdfs/     FastDFS
         ├── glusterfs/   GlusterFS

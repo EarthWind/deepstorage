@@ -48,12 +48,36 @@ CephFS 是构建在 RADOS 之上的分布式共享文件系统：MDS 管理 name
 8. [生产运维、性能与安全](cephfs-operations.md)：容量规划、监控、压测、升级、CephX 和加密。
 9. [技术评估与设计启示](cephfs-analysis.md)：设计取舍、可借鉴机制、通用设计建议、选型决策和 PoC 建议。
 
+### 3.1 设计与实现文档
+
+在上述调研文档之外，[design/](design/README.md) 与 [implementation/](implementation/README.md) 两个子目录从存储研发工程师视角给出体系化的设计与实现说明，并配有 Mermaid 架构图、状态机和时序图：
+
+```text
+cephfs/
+├── README.md                     本文：版本基线、结论、导航
+├── sources.md / cephfs-*.md      调研文档（定位、评估、运维）
+├── design/                       设计文档：模型、契约、不变量
+│   ├── cephfs-design-architecture.md      总体架构、组件职责、关键设计决策
+│   ├── cephfs-design-metadata.md          namespace、子树分区、dirfrag、journal、均衡
+│   ├── cephfs-design-data.md              条带化、CRUSH 放置、副本/EC、读写与删除
+│   ├── cephfs-design-consistency.md       caps、分布式锁状态机、fencing、POSIX 边界
+│   ├── cephfs-design-ha.md                rank 模型、恢复状态机、scrub 与灾难恢复
+│   └── cephfs-design-snapshot-tenancy.md  快照 COW、子卷/配额、异步镜像
+└── implementation/               实现文档：源码、流程、编码
+    ├── cephfs-impl-source-map.md          源码地图、模块依赖、线程模型、消息体系
+    ├── cephfs-impl-mds.md                 MDS 子系统剖析
+    ├── cephfs-impl-client.md              内核 / 用户态客户端剖析
+    ├── cephfs-impl-request-flows.md       9 个关键请求的端到端时序
+    └── cephfs-impl-on-disk-format.md      RADOS 对象命名、omap / journal / backtrace 编码
+```
+
 ## 4. 阅读建议
 
 - 做架构选型：先读本文、[系统概览](cephfs-overview.md) 和 [技术评估](cephfs-analysis.md)。
 - 做性能/容量规划：读 [元数据](cephfs-metadata.md)、[数据路径](cephfs-data-path.md) 和 [生产运维](cephfs-operations.md)。
 - 做一致性与故障设计：读 [一致性](cephfs-consistency.md) 和 [HA/恢复](cephfs-ha-recovery.md)。
 - 做 Kubernetes/多租户/灾备：读 [快照、子卷与镜像](cephfs-snapshots-tenancy.md)，并特别关注配额和镜像的非强制边界。
+- 做 CephFS 研发、源码阅读或深度排障：按 [设计文档](design/README.md) → [实现文档](implementation/README.md) 的顺序阅读，重点看 [关键请求流程](implementation/cephfs-impl-request-flows.md) 与 [持久化格式](implementation/cephfs-impl-on-disk-format.md)。
 
 ## 5. 总体判断
 
