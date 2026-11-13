@@ -69,7 +69,8 @@ cephfs/
     ├── cephfs-impl-client.md              内核 / 用户态客户端剖析
     ├── cephfs-impl-request-flows.md       9 个关键请求的端到端时序
     ├── cephfs-impl-on-disk-format.md      RADOS 对象命名、omap / journal / backtrace 编码
-    └── cephfs-impl-bootstrap.md           文件系统初始化：fs new、rank 分配、boot_create
+    ├── cephfs-impl-bootstrap.md           文件系统初始化：fs new、rank 分配、boot_create
+    └── cephfs-impl-storage-indexing.md    文件 / 目录 / 数据块的存储与索引方式
 ```
 
 ## 4. 阅读建议
