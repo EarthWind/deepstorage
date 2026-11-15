@@ -9,7 +9,7 @@
 ```
 deepstorage/
 └── filesystem/
-    ├── papers/      分布式文件存储重要论文清单（2000 – 2026.08）
+    ├── papers/      分布式文件存储论文：重要论文清单（2000 – 2026.08）+ 2020 年后论文详解
     └── project/
         ├── 3fs/         DeepSeek 3FS（Fire-Flyer File System）
         ├── beegfs/      BeeGFS
@@ -19,8 +19,7 @@ deepstorage/
         ├── glusterfs/   GlusterFS
         ├── juicefs/     JuiceFS
         ├── lustre/      Lustre
-        ├── seaweedfs/   SeaweedFS
-        └── papers/      分布式文件系统论文调研（2020 年之后）
+        └── seaweedfs/   SeaweedFS
 ```
 
 ## 调研对象
@@ -41,13 +40,13 @@ deepstorage/
 
 [filesystem/papers/](filesystem/papers/README.md) 给出 2000 年至 2026 年 8 月的重要论文清单：核心必读 25 篇，以及按生产系统、元数据、数据路径、复制与共识、纠删码、HPC / AI 存储、客户端、新硬件、可靠性实证分类的完整列表和按年份索引。
 
-[filesystem/project/papers/](filesystem/project/papers/README.md) 收录 2020 年（含）之后发表于 FAST / OSDI / SOSP / ATC / EuroSys / NSDI / ASPLOS / SC / SoCC 等会议的分布式文件系统论文，以及少量经核实的工业界技术报告，按五个方向组织：
+同一目录下的详解文档收录 2020 年（含）之后发表于 FAST / OSDI / SOSP / ATC / EuroSys / NSDI / ASPLOS / SC / SoCC 等会议的分布式文件系统论文，以及少量经核实的工业界技术报告，按五个方向组织：
 
-1. [工业界大规模生产系统](filesystem/project/papers/industry-production-systems.md)：Tectonic、Pangu、Fisc、Baidu CFS、3FS、FalconFS、Colossus 等
-2. [元数据扩展性](filesystem/project/papers/metadata-scalability.md)：InfiniFS、SingularFS、λFS、FileScale、Mantle、HMFS、MesaFS、SwitchFS 等
-3. [新硬件方向](filesystem/project/papers/new-hardware.md)：持久内存、RDMA、SmartNIC / DPU 卸载、CXL
-4. [HPC 与 AI 训练存储](filesystem/project/papers/hpc-ai-storage.md)：burst buffer、训练缓存、checkpoint 存储
-5. [客户端与通用技术](filesystem/project/papers/client-and-general-techniques.md)：FUSE 优化、缓存一致性、纠删码、可靠性实证与 crash consistency
+1. [工业界大规模生产系统](filesystem/papers/industry-production-systems.md)：Tectonic、Pangu、Fisc、Baidu CFS、3FS、FalconFS、Colossus 等
+2. [元数据扩展性](filesystem/papers/metadata-scalability.md)：InfiniFS、SingularFS、λFS、FileScale、Mantle、HMFS、MesaFS、SwitchFS 等
+3. [新硬件方向](filesystem/papers/new-hardware.md)：持久内存、RDMA、SmartNIC / DPU 卸载、CXL
+4. [HPC 与 AI 训练存储](filesystem/papers/hpc-ai-storage.md)：burst buffer、训练缓存、checkpoint 存储
+5. [客户端与通用技术](filesystem/papers/client-and-general-techniques.md)：FUSE 优化、缓存一致性、纠删码、可靠性实证与 crash consistency
 
 ## 每个系统的文档组织
 
@@ -72,7 +71,7 @@ deepstorage/
 - **快速选型**：先读目标系统的 `README.md`，再读 `*-analysis.md` 中的适用性评分与选型建议。
 - **架构评审**：按 overview → metadata → data-path → consistency → ha-recovery 的顺序阅读。
 - **入门与补课**：从 [论文清单](filesystem/papers/essential-papers-2000-2026.md) 的核心必读 25 篇开始。
-- **设计新系统**：横向阅读各系统 `*-analysis.md` 中"可借鉴 / 应规避的设计"章节，并对照 [论文调研](filesystem/project/papers/README.md) 的元数据扩展性与工业界生产系统两篇。
+- **设计新系统**：横向阅读各系统 `*-analysis.md` 中"可借鉴 / 应规避的设计"章节，并对照 [论文调研](filesystem/papers/README.md) 的元数据扩展性与工业界生产系统两篇。
 - **准备 PoC 或上线**：重点阅读 operations 文档，并把 ha-recovery 文档中的故障注入项纳入验收。
 - **核验结论**：通过各目录 `sources.md` 回到固定版本源码与官方文档。
 
