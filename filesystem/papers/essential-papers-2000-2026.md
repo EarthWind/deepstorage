@@ -6,7 +6,7 @@
 >
 > 选取标准：满足以下至少一条——(1) 定义了一条被后续系统反复采用的架构路线；(2) 描述了真实大规模生产系统并公开了关键设计与数据；(3) 给出了被广泛引用的实证研究或理论结果；(4) 是理解现代分布式存储必须掌握的基础组件（共识、复制、纠删码）。
 >
-> 2020 年之后的论文在本仓库另有逐篇详解，见 [../project/papers/](../project/papers/README.md)；本清单对这部分只做索引与一句话定位。
+> 2020 年之后的论文在本仓库另有逐篇详解，见 [本目录的详解文档](README.md#2-详解文档导航)；本清单对这部分只做索引与一句话定位。
 
 ## 0. 使用说明
 
@@ -250,7 +250,7 @@
 | [JuiceFS](../project/juicefs/README.md) | 无论文；对比 Tachyon SoCC 2014、ADLS SIGMOD 2017 的"对象存储 + 外置元数据"路线 |
 | [Lustre](../project/lustre/README.md) | Lustre OLS 2003、PLFS SC 2009、A Year in the Life SC 2018 |
 | [SeaweedFS](../project/seaweedfs/README.md) | Haystack OSDI 2010、f4 OSDI 2014 |
-| [2020 年后论文详解](../project/papers/README.md) | 本清单第 2–10 节中 2020 年及以后的全部条目 |
+| [2020 年后论文详解](README.md#2-详解文档导航) | 本清单第 2–10 节中 2020 年及以后的全部条目 |
 
 ## 12. 按年份总索引
 
