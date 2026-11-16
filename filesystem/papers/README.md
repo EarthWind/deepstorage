@@ -28,6 +28,10 @@
 4. [HPC 与 AI 训练存储](hpc-ai-storage.md)：HadaFS、DeltaFS、UnifyFS、GekkoFS、CHFS 等 burst buffer / 超算文件系统，Quiver、SHADE、SiloD 等训练缓存，以及 CheckFreq、Gemini、ByteCheckpoint 等 checkpoint 存储工作。
 5. [客户端与通用技术](client-and-general-techniques.md)：FUSE 优化（XFUSE、RFUSE、FUSE-over-io_uring）、缓存一致性（DFUSE、Concordia）、纠删码（ECWide、wide LRC、Tiger、RepairBoost、ParaRC）、可靠性实证与 crash consistency（Perseus、EBS 演进、Metis 等）。
 
+单篇精读（基于论文原文逐节解读，含架构图、流程图与整体总结）：
+
+- [Tectonic（FAST 2021）](tectonic-fast2021.md)：Facebook EB 级多租户文件系统。覆盖三层哈希分片元数据、单写者与跨分片 move、TrafficGroup 多租户、数仓 hedged quorum 写与 Blob quorum append 转码、生产数据与经验教训。
+
 ## 3. 跨文档重叠说明
 
 部分论文同时涉及多个主题，会在多份文档中出现；下表标注主文档（详解所在），其余文档为交叉视角或简述：
