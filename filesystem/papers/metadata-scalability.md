@@ -82,18 +82,19 @@ POSIX 语义要求逐级检查路径上每一级目录的存在性与权限。�
 
 ### 2.2 InfiniFS: An Efficient Metadata Service for Large-Scale Distributed Filesystems（FAST 2022）
 
-- **作者/机构**：Wenhao Lv、Youyou Lu、Yiming Zhang、Peile Duan、Jiwu Shu，清华大学（合作单位含厦门大学/阿里巴巴，待确认）
+- **作者/机构**：Wenhao Lv、Youyou Lu、Yiming Zhang、Peile Duan、Jiwu Shu，清华大学、厦门大学、阿里巴巴集团
 - **会议/年份**：USENIX FAST 2022
 - **链接**：https://www.usenix.org/conference/fast22/presentation/lv （PDF: https://www.usenix.org/system/files/fast22-lv.pdf）
 - **解决的问题**：百亿～千亿文件规模下，目录树分区的局部性/均衡矛盾、路径解析长链延迟、近根热点三大问题。
 - **核心设计**：
   - **namespace 划分**：把目录 inode 拆为 **access metadata**（name、ID、权限，用于路径解析）与 **content metadata**（entry list、timestamps）。access metadata 与父目录同分区（保证解析局部性），content metadata 与子项同分区（保证目录操作局部性）；以目录为粒度 hash 分组，兼顾局部性与均衡。
-  - **路径解析**：**speculative path resolution**——利用"目录 ID 可由 (父 ID, name) 可预测生成"的设计，客户端并行地推测各级目录 ID 并发起并行 lookup，把 O(N) 串行往返压成近似 O(1)，失败时回退逐级解析。
+  - **路径解析**：**speculative path resolution**——利用"目录 ID = hash(出生父目录 ID, name, 名字版本)，rename 后不变"的设计，客户端并行地推测各级目录 ID 并发起并行 lookup，把 O(N) 串行往返压成近似 O(1)，预测失败（仅目录 rename 或哈希冲突导致）时服务器返回真实 ID，客户端从该级继续推测，多一轮 RTT。
   - **热点**：客户端 **optimistic access metadata cache**，用版本机制惰性失效，缓解近根热点。
-  - **事务/一致性**：rename 与跨分片修改通过分布式事务处理（较重，是后续 CFS 攻击点）。
-  - **存储引擎**：分片 KV 存储（论文实现基于内存 KV + RocksDB 持久化，细节待确认）。
+  - **事务/一致性**：约 90% 操作单服务器本地事务；mkdir/rmdir/statdir 与文件 rename 跨两台服务器用 2PC（较重，是后续 CFS 攻击点）；目录 rename 经中心 rename 协调者做孤儿环检测并广播失效信息，吞吐约 10K ops/s。
+  - **存储引擎**：每台元数据服务器用本地 RocksDB 作 KV 后端，Thrift RPC 通信；目录分组按目录 ID 一致性哈希到服务器。
 - **关键实验结果**：吞吐较 HopsFS 高 73×、较 CephFS 高 23×；目录树规模达 **1000 亿文件**仍保持稳定性能与近线性扩展。
 - **局限性**：推测解析依赖 ID 生成规则，rename/迁移后推测失败率上升；跨分片操作仍需分布式事务；客户端缓存失效协议增加复杂度。
+- **逐节精读**：[infinifs-fast2022.md](infinifs-fast2022.md)
 - **设计启示**：access/content 元数据解耦是元数据服务表结构设计的高价值模式：inode 表可拆为 `dentry(parent_id, name) -> {id, mode, uid...}` 与 `dir_content(id) -> ...` 两类 KV，分别按 parent_id 和自身 id 分区。可预测目录 ID + 客户端并行 lookup 能显著降低深路径 open 延迟。
 
 ### 2.3 CFS: Scaling Metadata Service for Distributed File System via Pruned Scope of Critical Sections（EuroSys 2023）
