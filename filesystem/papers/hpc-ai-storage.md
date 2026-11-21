@@ -178,7 +178,7 @@ AI 训练的 I/O 模式与传统 HPC 明显不同：
 - **作者/机构**：Mark Zhao（Stanford/Meta）等，Meta 与 Stanford
 - **会议年份**：USENIX ATC 2023（注意：非 FAST 2023）
 - **链接**：<https://www.usenix.org/conference/atc23/presentation/zhao>
-- **AI 训练 I/O 角度简述**：Meta 生产 ML 训练的数据存储原先由 HDD 为主的 Tectonic 承担，但训练读的 IOPS 需求使 HDD 的 IO-per-watt 成为扩展瓶颈。Tectonic-Shift 在 Tectonic 之上加一层 flash 缓存层 Shift，用 I/O 高效的 flash 吸收训练读流量，降低对 HDD 容量/主轴数的需求，从而提升整个存储 fabric 的功耗效率。其缓存准入/放置利用训练作业的数据集访问可预测性（训练计划已知即将读什么）。这一"HDD 容量层 + flash 训练读加速层 + 训练感知预取"的分层模式是工业界共识。Tectonic 本体与该论文的完整分析见 [industry-production-systems.md](industry-production-systems.md)。
+- **AI 训练 I/O 角度简述**：Meta 生产 ML 训练的数据存储原先由 HDD 为主的 Tectonic 承担，但训练读的 IOPS 需求使 HDD 的 IO-per-watt 成为扩展瓶颈。Tectonic-Shift 在 Tectonic 之上加一层 flash 缓存层 Shift，用 I/O 高效的 flash 吸收训练读流量，降低对 HDD 容量/主轴数的需求，从而提升整个存储 fabric 的功耗效率。其缓存准入/重插入利用训练作业的数据集访问可预测性（训练计划已知即将读什么）；Shift 不做主动预取，只在 miss 时按准入策略填充。这一"HDD 容量层 + flash 训练读加速层 + 训练感知准入"的分层模式是工业界共识。Tectonic 本体与该论文的完整分析见 [industry-production-systems.md](industry-production-systems.md)，逐节精读见 [tectonic-shift-atc2023.md](tectonic-shift-atc2023.md)。
 - **设计启示**：面向 EiB 级低成本（EC + HDD 可行）的系统，AI 训练读负载不应直接压容量层；应预留"训练读缓存层"位置（独立 flash 缓存集群或存储节点内分层），并利用训练侧的访问计划做预取——接口上值得为"数据集即将被顺序/随机全量读"暴露 hint API。
 
 ---

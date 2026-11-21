@@ -73,12 +73,13 @@ Meta 的 ML 训练（推荐模型为主）对训练数据存储提出了海量�
 ### 核心架构设计
 
 - **复合存储层（composite storage fabric）**：在 HDD 底座 Tectonic 之上加入 **Shift**——一个 flash 缓存层，二者组成面向训练数据的复合存储结构，目标是**最大化每瓦特有效带宽**；
-- **应用感知的缓存策略**：Shift 不用通用 LRU，而是利用训练作业的数据集规格（dataset specification）**推断未来访问模式**，据此做准入与驱逐决策（训练数据访问是可预知的、按 epoch 扫描的）；
+- **应用感知的缓存策略**：Shift 利用训练作业的数据集规格（dataset specification）**推断未来访问模式**，据此做**准入与重插入**决策（淘汰仍用 CacheLib 的 LRU/FIFO）；训练作业要读哪些分区在启动时即已确定，且通常只读一个 epoch，复用发生在不同作业之间；
 - 数据路径上训练数据读取先查 Shift flash 层，未命中回源 Tectonic HDD 层。
 
 ### 关键实验结果 / 生产规模
 
 - 应用感知缓存策略比传统 LRU flash 缓存多吸收 **1.51–3.28x** 的 IO；
+- 逐节精读见 [tectonic-shift-atc2023.md](tectonic-shift-atc2023.md)。
 - 在 PB 级生产集群上使存储**功耗需求降低 29%**。
 
 ### 设计启示
