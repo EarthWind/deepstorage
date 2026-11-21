@@ -157,9 +157,10 @@ Pangu 是阿里统一存储底座（支撑 EBS、OSS、NAS、数据库、MaxComp
 ## 5. Baidu CFS（EuroSys 2023）
 
 - **论文标题**：CFS: Scaling Metadata Service for Distributed File System via Pruned Scope of Critical Sections
-- **作者/机构**：百度（Baidu AI Cloud）团队与合作高校（作者含 Yiduo Wang 等；百度官方发文确认为百度沧海·文件存储 CFS 的论文）
+- **作者/机构**：Yiduo Wang、Cheng Li 等 10 人，中国科学技术大学 + 百度（中国）有限公司（百度官方发文确认为百度沧海·文件存储 CFS 的论文）
 - **会议与年份**：ACM EuroSys 2023
 - **论文链接**：<https://dl.acm.org/doi/10.1145/3552326.3587443>（百度官方解读：<https://cloud.baidu.com/article/320331>）
+- **逐节精读**：[cfs-eurosys2023.md](cfs-eurosys2023.md)
 
 ### 解决的问题
 
@@ -167,9 +168,9 @@ Pangu 是阿里统一存储底座（支撑 EBS、OSS、NAS、数据库、MaxComp
 
 ### 核心架构设计
 
-- **分层元数据组织（tiered metadata organization）**：把文件属性（attributes）与命名空间层级（namespace hierarchy）分开，用各自合适的分区与索引方法独立扩展，**消除跨 shard 分布式协调**；
-- **单 shard 原子原语**：通过精简临界区（pruned scope of critical sections）缩短元数据请求生命周期、消除伪冲突，提升单元数据 shard 性能；
-- **去代理层**：砍掉元数据 proxy 层，改为轻量、可扩展的**客户端侧路径解析**（client-side metadata resolving）。
+- **分层元数据组织（tiered metadata organization）**：把文件属性（attributes）与命名空间层级（namespace hierarchy）分开，用各自合适的分区与索引方法独立扩展，**消除跨 shard 分布式协调**：命名空间层级存 TafDB，按父目录 id 范围分区，目录属性与子项同分片；文件属性存 FileStore（每节点 RocksDB），按 inode id 哈希、与数据同节点；两层之间靠固定写入顺序 + 后台 GC 代替 2PC；
+- **单 shard 原子原语**：三条参数化原语把"检查 + 读 + 写"合成一条命令，缩短元数据请求生命周期；父目录属性的并发修改用 delta apply（计数类）和 last-writer-wins（时间、权限）合并，消除伪冲突；约 99% 的 rename（同目录文件 rename）也走单分片原语，其余交给 Renamer 加锁 + 2PC；
+- **去代理层**：砍掉元数据 proxy 层，改为轻量、可扩展的**客户端侧元数据解析**（client-side metadata resolving）：ClientLib 缓存 TafDB / FileStore 的分区信息，直接把请求路由到对应组件。
 
 ### 关键实验结果 / 生产规模
 
@@ -180,7 +181,7 @@ Pangu 是阿里统一存储底座（支撑 EBS、OSS、NAS、数据库、MaxComp
 
 - 元数据服务的核心难题不是"存多少元数据"而是"锁与事务范围"：设计元数据操作时应逐操作分析其最小临界区，把 rename/mkdir 等复合操作尽量收敛到单 shard 原子原语上；
 - "属性与命名空间分开分片"的思路可直接复用：inode 属性表按 inode id 哈希分片，目录项表按目录分片，二者独立扩展；
-- 路径解析放客户端（带缓存与失效协议）可以砍掉一层转发延迟，但需要设计好缓存一致性协议。
+- 当服务端逻辑简化到只剩路由时，可以把代理层并入客户端库，砍掉一层转发（CFS 因素分析中延迟再降 20%–32%）；但 CFS 仍是逐级 lookup，没有路径解析加速，深路径场景需要另行设计（如 InfiniFS 的推测式解析）。
 
 ---
 
