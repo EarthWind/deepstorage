@@ -86,13 +86,13 @@ FUSE 是分布式文件系统挂载 POSIX 接口最常见的途径（CephFS、Gl
 
 ### 2.3 CFS: Scaling Metadata Service for Distributed File System via Pruned Scope of Critical Sections
 
-- **作者/机构**：百度（Baidu AI Cloud）团队
+- **作者/机构**：Yiduo Wang、Cheng Li 等，中国科学技术大学 + 百度（Baidu AI Cloud）
 - **会议年份**：EuroSys 2023
-- **链接**：<https://dl.acm.org/doi/10.1145/3552326.3587443>
+- **链接**：<https://dl.acm.org/doi/10.1145/3552326.3587443>；逐节精读：[cfs-eurosys2023.md](cfs-eurosys2023.md)
 - **问题**：POSIX 语义要求元数据操作具备事务性（如 rename 的原子性），分布式实现中跨分片协调与临界区过大成为吞吐瓶颈。
 - **核心设计**：(1) 分层元数据组织：文件属性与命名空间层级分别独立扩展，用合适的分区/索引方法消除跨分片分布式协调；(2) 单分片原子原语：缩短元数据请求生命周期、去除虚假冲突，把绝大多数操作收敛为单分片事务；(3) 去掉元数据代理层，用轻量的客户端侧元数据解析（client-side metadata resolving）。
 - **关键结果**：百度生产环境运行三年；50 节点集群上吞吐较 HopsFS 提升 1.76–75.82 倍、较 InfiniFS 提升 1.22–4.10 倍，平均延迟最多降低 91.71%。
-- **设计启示**：对元数据分片设计的核心教训是"让事务边界与分片边界重合"：通过元数据布局（如 inode 属性与 dentry 分离、同目录 dentry 聚合）把 create/unlink/rename 大多数情形化为单分片原子操作，只有跨目录 rename 才走两阶段协议；同时客户端直接参与路径解析可省掉一层代理转发。
+- **设计启示**：对元数据分片设计的核心教训是"让事务边界与分片边界重合"：通过元数据布局（如 inode 属性与 dentry 分离、同目录 dentry 聚合）把 create/unlink/rename 大多数情形化为单分片原子操作，只有同目录文件 rename 以外的 rename 才交给 Renamer 走加锁 + 两阶段协议；同时客户端直接做元数据路由可省掉一层代理转发。
 
 ### 2.4 Concordia: Distributed Shared Memory with In-Network Cache Coherence
 

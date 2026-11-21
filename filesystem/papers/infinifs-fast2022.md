@@ -782,4 +782,4 @@ flowchart LR
 - Kai Ren et al. *IndexFS: Scaling File System Metadata Performance with Stateless Caching and Bulk Insertion*. SC 2014.
 - Salman Niazi et al. *HopsFS: Scaling Hierarchical File System Metadata Using NewSQL Databases*. USENIX FAST 2017.
 - Sage A. Weil et al. *Ceph: A Scalable, High-Performance Distributed File System*. OSDI 2006.
-- Yiduo Wang et al. *CFS: Scaling Metadata Service for Distributed File System via Pruned Scope of Critical Sections*. EuroSys 2023.（后续工作，见[元数据扩展性综述](metadata-scalability.md)）
+- Yiduo Wang et al. *CFS: Scaling Metadata Service for Distributed File System via Pruned Scope of Critical Sections*. EuroSys 2023.（后续工作，本仓库精读：[cfs-eurosys2023.md](cfs-eurosys2023.md)）

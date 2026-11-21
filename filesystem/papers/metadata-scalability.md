@@ -31,7 +31,7 @@ POSIX 语义要求逐级检查路径上每一级目录的存在性与权限。�
 
 ### 1.3 rename 与跨目录原子性
 
-`rename` 是元数据设计的"试金石"：跨目录 rename 涉及两个（可能位于不同分片的）目录项，且目录 rename 还要防止环（loop，即把祖先目录移入其后代）。分布式事务（2PC）可以解决，但代价高且与热点耦合。各论文的做法差异很大：单独的 rename service（CFS）、把环检测 offload 到集中组件（Mantle 的 IndexNode）、依赖底层事务 KV/DB（Tectonic、FileScale、HopsFS 谱系）、或干脆用单元数据服务器回避分布式事务（SingularFS）。
+`rename` 是元数据设计的"试金石"：跨目录 rename 涉及两个（可能位于不同分片的）目录项，且目录 rename 还要防止环（loop，即把祖先目录移入其后代）。分布式事务（2PC）可以解决，但代价高且与热点耦合。各论文的做法差异很大：同目录文件 rename 走单分片快路径、其余交给独立 Renamer（CFS）、把环检测 offload 到集中组件（Mantle 的 IndexNode）、依赖底层事务 KV/DB（Tectonic、FileScale、HopsFS 谱系）、或干脆用单元数据服务器回避分布式事务（SingularFS）。
 
 ### 1.4 热点（hotspot）
 
@@ -99,17 +99,19 @@ POSIX 语义要求逐级检查路径上每一级目录的存在性与权限。�
 
 ### 2.3 CFS: Scaling Metadata Service for Distributed File System via Pruned Scope of Critical Sections（EuroSys 2023）
 
-- **作者/机构**：Yiduo Wang、Yufei Wu、Cheng Li、Pengfei Zheng、Biao Cao、Yan Sun 等，中国科学技术大学 + 百度（Baidu CFS 团队；作者名单较长，以 DL 页为准）
+- **作者/机构**：Yiduo Wang、Yufei Wu、Cheng Li、Pengfei Zheng、Biao Cao、Yan Sun、Fei Zhou、Yinlong Xu、Yao Wang、Guangjun Xie，中国科学技术大学 + 百度（中国）有限公司 + 安徽省高性能计算重点实验室（通讯作者 Cheng Li）
 - **会议/年份**：ACM EuroSys 2023
 - **链接**：https://dl.acm.org/doi/10.1145/3552326.3587443 ；背景文章：https://cloud.baidu.com/article/320331
 - **解决的问题**：分布式元数据的锁/临界区与分布式事务开销是扩展瓶颈；目标是千亿文件规模、完整 POSIX 语义。
 - **核心设计**：
-  - **namespace 划分**：**tiered metadata organization（分层元数据组织）**——文件属性（attributes）与其余 namespace 层级结构分开扩展：namespace 层级存入分布式表格系统 **TafDB**（按目录聚合布局），文件属性下沉到 FileStore 与数据一起管理；另设独立 **Rename Service** 处理复杂 rename。
-  - **临界区裁剪**：通过数据布局把关联修改聚合到**单个分片**，将跨分片分布式事务简化为**单分片事务**；实现三种定制单分片事务原语，把多轮交互压缩为一次；属性更新冲突用 delta apply / last-writer-wins 自动合并，避免加锁。
-  - **路径解析**：目录聚合布局下逐级解析，单级 lookup 单分片完成（客户端缓存细节待确认）。
-  - **存储引擎**：TafDB（百度自研分布式表格存储）+ FileStore。
-- **关键实验结果**：50 节点集群上，吞吐较 HopsFS 提升 **1.76–75.82×**，较 InfiniFS 提升 **1.22–4.10×**；平均延迟分别降低 91.71% 与 54.54%。生产目标规模为千亿级文件（百度沧海 CFS）。
-- **局限性**：复杂 rename 走独立慢路径服务；架构与特定表格系统（TafDB）深度耦合；跨层（TafDB/FileStore）一致性协议复杂。
+  - **namespace 划分**：**tiered metadata organization（分层元数据组织）**——文件属性（attributes）与其余 namespace 层级结构分开扩展：namespace 层级存入分布式数据库 **TafDB** 的单张 `inode_table`，主键 `<kID, kStr>`（id 记录为 `<父 id, 名字>`，目录属性记录为 `<自身 id, "/_ATTR">`），按 kID 范围分区，使目录属性与其子项同分片；文件属性下沉到 FileStore（每节点 RocksDB），按 inode id 哈希、与数据同节点。TafDB 与 FileStore 之间不做 2PC：创建类请求最后写 TafDB、删除类请求最先写 TafDB，孤儿属性由基于 WAL 配对分析的后台 GC 清理。另设 Raft 保护的 **Renamer** 处理复杂 rename。
+  - **临界区裁剪**：通过数据布局把关联修改聚合到**单个分片**，将跨分片分布式事务简化为**单分片事务**；实现三种参数化单分片原语（`insert_with_update`、`delete_with_update`、`insert_and_delete_with_update`），把"检查 + 读 + 写"合成一条命令；父目录属性的并发修改中，数值字段（children、links、size）用 delta apply、覆盖字段（time、权限）用 last-writer-wins（以 TafDB 时间戳服务器的单调时间戳定序），避免加锁。
+  - **rename**：约 99% 的生产 rename 是同目录文件 rename，走单分片快路径（客户端直接对 TafDB 执行原语）；其余由 Renamer 协调者加锁 + 2PC，并锁住源、目标及最近公共祖先做孤儿环检查。
+  - **路径解析与去代理**：去掉元数据代理层，ClientLib 缓存 TafDB / FileStore 的分区信息，直接把请求路由到 FileStore、TafDB 或 Renamer（client-side metadata resolving）；路径仍逐级 lookup（单级单分片），论文没有提出路径解析加速或客户端缓存失效协议。
+  - **存储引擎**：TafDB（时间戳服务器 + Raft 复制的后端服务器）+ FileStore（对象存储 + 每节点 RocksDB 存文件属性）。
+- **关键实验结果**：50 节点集群上，无竞争时吞吐较 HopsFS 提升 **1.76–75.82×**，较 InfiniFS 提升 **1.22–4.10×**，平均延迟最多分别降低 91.71% 与 54.54%（但 create 因多写一次 FileStore，延迟比 InfiniFS 高 17.41%）；竞争率 ≥50% 时 mkdir 吞吐为 InfiniFS 的 41.52–48.36×；百万文件共享目录下 getattr/setattr 为 InfiniFS 的 20.84–34.19×；3 个生产 trace 端到端吞吐为 InfiniFS 的 1.62–2.55×。pjdfstest 8832 个用例全部通过。论文称已在百度智能云运行 3 年，单个部署承载数千个文件系统实例、数十亿以上文件（"千亿级"目标来自百度官方文章）。
+- **局限性**：复杂 rename 走 Renamer 慢路径（加锁 + 2PC）；没有路径解析加速，深路径场景未评估；create 多一次 RPC；架构与 TafDB 的定制原语深度耦合；跨层一致性依赖 GC。
+- **逐节精读**：[cfs-eurosys2023.md](cfs-eurosys2023.md)
 - **设计启示**：元数据服务的第一性原则应是"**让常见元数据操作落在单分片**"：通过布局（按目录聚合 + 属性与 dentry 分离）把 create/unlink/stat 变成单分片事务，只为 rename 保留昂贵路径。这比引入通用分布式事务框架代价小得多。
 
 ### 2.4 SingularFS: A Billion-Scale Distributed File System Using a Single Metadata Server（USENIX ATC 2023）
@@ -246,8 +248,8 @@ POSIX 语义要求逐级检查路径上每一级目录的存在性与权限。�
 | 论文 | 元数据分区策略 | 路径解析 | rename 处理 | 底层存储 | 规模数据 |
 |---|---|---|---|---|---|
 | Tectonic (FAST'21) | 三层（name/file/block）各按 ID hash 分区 | 逐级 lookup，目录项同分片 | 跨分片不保证原子（语义取舍） | ZippyDB（分片事务 KV / RocksDB） | EB 级数据，数十亿文件，生产 |
-| InfiniFS (FAST'22) | access/content 元数据解耦，按目录 hash 分组 | speculative 并行解析 + 客户端乐观缓存 | 分布式事务 | 分片 KV（待确认细节） | 1000 亿文件；73× vs HopsFS |
-| CFS (EuroSys'23) | 属性与 namespace 分层：TafDB（按目录聚合）+ FileStore | 逐级，单级单分片 | 独立 Rename Service（慢路径） | TafDB + FileStore | 千亿级目标；50 节点 1.22–4.10× vs InfiniFS |
+| InfiniFS (FAST'22) | access/content 元数据解耦，按目录 hash 分组 | speculative 并行解析 + 客户端乐观缓存 | 文件 rename 2PC；目录 rename 经中心协调者防环 + 广播失效 | RocksDB（每台元数据服务器） | 1000 亿文件；73× vs HopsFS |
+| CFS (EuroSys'23) | 属性与 namespace 分层：TafDB（按父 id 范围分区）+ FileStore（按 id 哈希） | 客户端逐级 lookup，单级单分片 | 同目录文件 rename 单分片快路径；其余 Renamer 加锁 + 2PC | TafDB + FileStore（RocksDB） | 生产 3 年；50 节点 1.22–4.10× vs InfiniFS |
 | SingularFS (ATC'23) | 不分区（单 MDS，机内 hybrid inode partition） | 单机内存解析 | 单机事务，无分布式协调 | NVMM（Optane PM）+ RDMA | 10 亿级文件 / 单服务器 |
 | λFS (ASPLOS'23) | serverless 函数一致性 hash 路由 + 函数内缓存 | 函数内缓存解析，未命中查 DB | 底层 NewSQL 分布式事务 | MySQL NDB Cluster | 弹性伸缩；优于 HopsFS（负载相关） |
 | FileScale (SoCC'23) | 三层：内存缓存 + DDBMS shared-nothing 分区 | 内存层快路径 | DDBMS 分布式 ACID 事务 | 分布式数据库（Calvin 谱系，待确认） | 小规模≈单机 HDFS；线性扩展 |
