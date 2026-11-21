@@ -31,6 +31,7 @@
 单篇精读（基于论文原文逐节解读，含架构图、流程图与整体总结）：
 
 - [Tectonic（FAST 2021）](tectonic-fast2021.md)：Facebook EB 级多租户文件系统。覆盖三层哈希分片元数据、单写者与跨分片 move、TrafficGroup 多租户、数仓 hedged quorum 写与 Blob quorum append 转码、生产数据与经验教训。
+- [Tectonic-Shift（ATC 2023）](tectonic-shift-atc2023.md)：Meta 在 HDD Tectonic 前加透明 flash 读缓存 Shift 服务 ML 训练。覆盖功耗驱动的软硬件设计空间、DLRM 训练负载刻画、一致性哈希 + CacheLib 架构、基于作业规格的准入/重插入策略与 PID 写入限速、策略评估与生产 29% 功耗收益。
 
 ## 3. 跨文档重叠说明
 
