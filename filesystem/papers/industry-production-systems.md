@@ -107,7 +107,7 @@ Pangu 是阿里统一存储底座（支撑 EBS、OSS、NAS、数据库、MaxComp
   - 重构文件系统为**统一 append-only 持久层**（unified, append-only persistence layer），所有上层抽象（块、对象、文件）落到 append-only chunk 写入，天然利于 SSD 与 EC；
   - 自研**用户态存储操作系统 USSFS**（user-space storage file system）：绕过内核，run-to-completion 线程模型，用户态驱动直接操作 NVMe SSD，为不同硬件（含 SMR）提供 append 写引擎；
   - 网络侧大规模部署 RDMA（存算之间），配合自研 RPC 减少延迟抖动。
-- **第二阶段（网络带宽从 25G → 100G/200G 的基础设施升级）**：围绕"性能/成本"持续优化——流量放大优化（EC/压缩：在线 EC + FPGA 压缩降低网络放大）、独立网络端口隔离前后台流量、动态流控（如 Fisc 中的 proxy 侧限流）等。
+- **第二阶段（网络带宽从 25G → 100G/200G 的基础设施升级）**：围绕"性能/成本"持续优化——流量放大优化（EC/压缩：在线 EC + FPGA 压缩降低网络放大）、独立网络端口隔离前后台流量、动态流控等。
 - **一致性与容错**：chunk 多副本/EC，master 管理 chunkserver 状态；通过快速故障检测与切换（配合客户端重试/backup read）实现毫秒级 P999。（论文级细节如 master 一致性协议，待确认。）
 
 ### 关键实验结果 / 生产规模
@@ -129,6 +129,7 @@ Pangu 是阿里统一存储底座（支撑 EBS、OSS、NAS、数据库、MaxComp
 - **作者/机构**：Qiang Li 等，Alibaba Group，合作机构含复旦大学、南京大学、厦门大学
 - **会议与年份**：**USENIX FAST 2023**（注意：常被误记为 SOSP 2023，经核实实际发表于 FAST 2023）
 - **论文链接**：<https://www.usenix.org/conference/fast23/presentation/li-qiang-fisc>（PDF: <https://www.usenix.org/system/files/fast23-li-qiang.pdf>）
+- **逐节精读**：[fisc-fast2023.md](fisc-fast2023.md)
 
 ### 解决的问题
 
@@ -136,14 +137,16 @@ Pangu 是阿里统一存储底座（支撑 EBS、OSS、NAS、数据库、MaxComp
 
 ### 核心架构设计
 
-- **轻量客户端**：容器内只留极薄的 Fisc client，通过 **vRPC（virtual RPC）** 抽象与 virtio-Fisc 虚拟设备把请求穿过虚拟化边界交给基础设施层处理；vRPC 抽象亦可被 FaaS 等其他云原生服务复用；
-- **DPU 卸载**：I/O 快路径下沉到 DPU（神龙 CIPU 类硬件）上的 Fisc agent，加速数据路径并把存储栈资源从租户容器中移出；
-- **存储感知分布式网关 SaDGW（storage-aware distributed gateway）**：不走集中式网关，而是在每台计算服务器与其对应远端存储节点之间建立"直连高速路"；Fisc proxy 部署在存储节点侧，agent–proxy 之间共享连接、空闲连接回收、跨 region 只连接部分 proxy，以控制连接数规模；
-- **容错/高可用**：代理层可快速切换后端，配合限流与故障规避，将客户端故障域从应用容器中剥离。
+- **轻量客户端（两层聚合）**：容器内只留用 RPC 桩实现的极薄 Fisc client；网络栈与认证授权聚合到计算服务器 DPU 上的 Fisc agent，存储协议（副本、纠删码、故障处理）聚合到存储节点上的 Fisc proxy（DPU 资源不够做存储协议，且这样复制流量留在存储集群后端网络）；在此之上抽象出 **vRPC（virtual RPC）**，可被 FaaS 等其他云原生服务复用；
+- **DPU 软硬件协同**：基于神龙（X-Dragon）DPU 的 virtio-Fisc 设备（第一代复用 virtio-block 接口，第二代为 RPC 级定制设备，突破 virtio-block 128 队列深度限制）；DPU 的 FPGA 缓存"文件句柄 → 网络连接"作为快路径；为 DPU 稀缺资源做批处理、手写序列化、20 位 IP 压缩（每文件不超过 1 KB）等优化；
+- **存储感知分布式网关 SaDGW（storage-aware distributed gateway）**：不走集中式网关，而是在每台计算服务器与其对应远端存储节点之间建立"直连高速路"（Luna/Solar 网络栈）；agent 维护**文件粒度路由表**，open 时随机选 proxy 并记录；Fisc proxy 与盘古 chunkserver 同机部署，**就近读**把读请求直接发给持有数据的节点上的 proxy 并走共享内存，消除两倍读放大；agent–proxy 之间共享连接、空闲连接回收、跨 region 只连接部分 proxy，以控制连接数规模；
+- **容错/高可用**：agent 基于路由条目做存储感知的故障处理：重试（初始超时为平均延迟的 10 倍，逐次翻倍）、拉黑异常 proxy、换 proxy 重新打开文件；负载均衡按文件哈希分配 proxy，并由 proxy master 集中迁移热点文件；端到端 QoS 覆盖 virtio 队列、网卡、交换机 DSCP、独立线程与 SSD 调度。
+- **接口语义**：暴露盘古的只追加文件语义（read、append 等），通过 JNI 兼容 HDFS 生态，不是 POSIX 文件系统。
 
 ### 关键实验结果 / 生产规模
 
-- 相比 on-premise Pangu 胖客户端，**CPU 消耗降低 69%、内存降低 20%**，可用性提升一个数量级；
+- 相比 on-premise Pangu 胖客户端，**CPU 消耗降低 69%、内存降低 20%**（1.75 GB/s 固定速率写入；摘要另一处写作"只消耗 69% CPU"，与正文不一致），可用性提升一个数量级（故障恢复从秒级降到 100 ms 级）；生产 Swift 流服务切换后 CPU、内存少 16%、57%；
+- 相比网关负载均衡方案，延迟低 61%–76%，P999 低 92%；
 - 生产 DCN 部署 **3 年**，服务阿里 **300 万+ CPU 核**上的应用；在线搜索查询业务平均延迟 **< 500 µs**、P999 **< 60 ms**。
 
 ### 设计启示

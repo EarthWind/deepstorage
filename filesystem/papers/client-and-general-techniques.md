@@ -42,12 +42,12 @@ FUSE 是分布式文件系统挂载 POSIX 接口最常见的途径（CephFS、Gl
 
 ### 1.4 Fisc: A Large-scale Cloud-native-oriented File System
 
-- **作者/机构**：Qiang Li 等（阿里巴巴集团，联合若干高校）
+- **作者/机构**：Qiang Li 等（阿里巴巴集团，联合复旦大学、南京大学、厦门大学）
 - **会议年份**：USENIX FAST 2023
-- **链接**：<https://www.usenix.org/system/files/fast23-li-qiang.pdf>
+- **链接**：<https://www.usenix.org/system/files/fast23-li-qiang.pdf>；逐节精读：[fisc-fast2023.md](fisc-fast2023.md)
 - **问题**：云原生场景下单机需承载大量容器，传统"重客户端"（每个客户端承担网络栈、协议、缓存、QoS）资源占用过高且难以透明升级。
-- **核心设计**：把文件系统客户端做薄：将网络栈与存储协议下沉（offload）到 DPU，容器内仅保留轻量客户端；利用 DPU fast path 加速 I/O；提供存储感知的高可用机制与全路径 QoS 支持混部。
-- **关键结果**：在阿里生产环境支撑数百万核规模的云原生应用；单机可高密度承载容器客户端。
+- **核心设计**：把文件系统客户端做薄：网络栈与认证授权卸载到计算服务器 DPU 上的 Fisc agent，存储协议（副本、纠删码、故障处理）卸载到存储节点上的 Fisc proxy，容器内只保留用 RPC 桩实现的轻量客户端（数据类 API 用定制结构、元数据类 API 用 PB 保证版本兼容）；利用 DPU 中 FPGA 缓存路由表做快路径；agent 按文件粒度路由，提供存储感知的重试 / 重新打开、就近读与端到端 QoS。
+- **关键结果**：在阿里生产环境支撑 300 万以上 CPU 核的云原生应用，部署超过 3 年；客户端 CPU、内存比传统客户端少 69%、20%；生产 Swift 流服务切换后 CPU、内存少 16%、57%。
 - **设计启示**：SDK 客户端应控制每客户端资源占用（线程数、内存池），考虑"胖逻辑集中、薄端点分发"的结构：把路由表、连接池等重状态放在节点级共享代理（或未来的 DPU）中，容器内客户端只做转发，便于升级和高密度部署。
 
 ### 1.5 DPFS: DPU-Powered File System Virtualization
