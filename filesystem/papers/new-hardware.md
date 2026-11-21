@@ -27,7 +27,7 @@
 
 - NVIDIA BlueField（ARM 核 + NIC + PCIe switch）、AWS Nitro、阿里 CIPU 等 DPU 已在云厂商大规模部署。两类用法：
   1. **offload 后台任务**：把复制、压缩、CRC、日志 digest 等 CPU 密集工作移到 NIC ARM 核，释放主机 CPU 并降低性能干扰（LineFS）。
-  2. **offload 整个客户端**：文件系统客户端整体运行在 DPU 上，主机侧只剩 virtio-fs / virtio-blk 等标准设备接口，实现零主机开销 + 裸金属/VM/容器统一接入 + 租户隔离（DPFS、Fisc、DPC）。
+  2. **offload 整个客户端**：文件系统客户端整体运行在 DPU 上，主机侧只剩 virtio-fs / virtio-blk 等标准设备接口，实现零主机开销 + 裸金属/VM/容器统一接入 + 租户隔离（DPFS、DPC；Fisc 是部分卸载：网络与安全在 DPU，存储协议在存储侧 proxy，容器内仍保留极薄的 RPC 客户端）。
 - 关键工程事实：DPU 上的 ARM 核（wimpy cores）单核性能约为主机 x86 的 30-50%，直接移植软件会**变慢**——LineFS 的核心贡献正是用流水线并行掩盖 wimpy core 劣势。
 
 ### 1.4 NVMe / NVMe-oF：介质快到文件系统必须让路
@@ -162,27 +162,27 @@
 
 - **会议**：FAST 2023
 - **作者/机构**：Qiang Li 等，阿里巴巴集团（联合复旦大学、南京大学、厦门大学等）；盘古（Pangu）存储体系之上的云原生文件系统
-- **链接**：https://www.usenix.org/conference/fast23/presentation/li-qiang-fisc ；PDF https://www.usenix.org/system/files/fast23-li-qiang.pdf
-- **目标硬件**：自研 DPU（virtio-Fisc 设备）+ RDMA 数据中心网络 + NVMe SSD 存储集群
+- **链接**：https://www.usenix.org/conference/fast23/presentation/li-qiang-fisc ；PDF https://www.usenix.org/system/files/fast23-li-qiang.pdf ；逐节精读：[fisc-fast2023.md](fisc-fast2023.md)
+- **目标硬件**：神龙（X-Dragon）DPU（含 FPGA，承载 virtio-Fisc 设备）+ Luna/Solar 高性能网络栈 + 盘古 NVMe SSD 存储集群
 
 ### 核心设计
 
-- 面向容器化云原生场景：单机数百容器共享接入，传统重客户端（每客户端独占 CPU/内存/网络连接）无法复用资源。
-- **轻量客户端**：把客户端瘦身为 POSIX 转发层，重逻辑（打开状态、缓存、协议）下沉，两层资源聚合（单机聚合 + 集群网关聚合）提高复用率。
-- **存储感知分布式网关**（storage-aware distributed gateway）：位于存储集群侧，承接客户端请求并感知副本位置/负载做路由，提升 IO 服务的性能、可用性与可扩展性；网关无状态可水平扩展。
-- **DPU offload**：virtio-Fisc 设备在 DPU 中 offload 网络栈与存储协议，提供从用户虚拟域（容器）到云厂商物理域文件系统的安全高效直通（passthrough），绕过虚拟化软件栈。
+- 面向容器化云原生场景：单机可超过 1000 个容器（约为 VM 的 10 倍），传统重客户端（每客户端独占 CPU/内存/网络连接）无法复用资源。
+- **轻量客户端**：容器内客户端只剩 RPC 桩（暴露盘古的只追加文件接口，经 JNI 兼容 HDFS，不是 POSIX）；两层资源聚合：网络栈与认证授权聚合到计算服务器 DPU 上的 Fisc agent，存储协议（副本、纠删码、故障处理）聚合到存储节点上的 Fisc proxy。
+- **存储感知分布式网关**（storage-aware distributed gateway，SaDGW）：不是独立网关集群，而是由计算侧 DPU 上的 agent、存储节点上的 proxy 和 proxy master 组成，agent 与 proxy 直连；agent 维护文件粒度路由表，据此做重试 / 拉黑 / 重新打开等故障处理、按预测 chunk 位置做就近读（同机共享内存，消除两倍读放大），并按文件粒度做负载均衡。
+- **DPU offload**：virtio-Fisc 设备在 DPU 中 offload 网络栈与安全检查（存储协议不在 DPU，而在存储侧 proxy），提供从用户虚拟域（容器）到云厂商物理域文件系统的安全高效直通（passthrough）；FPGA 缓存路由表形成快路径；DPU 资源稀缺，故采用 20 位 IP 压缩（每文件不超过 1 KB，1 GB 内存容纳 100 万文件）、读请求不拆分、位置提示交给客户端保管等设计。
 
 ### 关键实验结果
 
-- 生产部署三年，服务阿里巴巴 300 万+ CPU 核上的应用（数据库、大数据、AI 等）；论文报告轻客户端资源占用降至传统客户端的零头、网关路由降低长尾延迟（具体数字见论文）。
+- 生产部署三年，服务阿里巴巴 300 万+ CPU 核上的应用；轻客户端 CPU、内存比传统客户端少 69%、20%（1.75 GB/s 固定速率写入）；延迟比网关负载均衡方案低 61%–76%，P999 低 92%；生产在线搜索平均写延迟约 500 µs；故障恢复从秒级降到 100 ms 级。
 
 ### 局限
 
-- 深度绑定阿里自研 DPU 与盘古基础设施，学术复现不可行；网关引入一跳转发（用聚合与调度收益换取），对极致延迟场景需 bypass 路径。
+- 深度绑定阿里自研 DPU 与盘古基础设施，学术复现不可行；相比重客户端直连，写路径多了 proxy 一跳（读路径用就近读 + 共享内存消除）；评估未给出 DPU 与 proxy 侧的资源消耗。
 
 ### 设计启示
 
-- **"轻客户端 + 无状态网关"是支撑容器高密度接入的现成蓝图**——SDK 保持直连存储节点的高性能路径，同时提供经网关的轻量路径供海量小租户复用连接与缓存。
+- **"轻客户端 + 存储感知的分布式接入层"是支撑容器高密度接入的现成蓝图**——SDK 保持直连存储节点的高性能路径，同时提供经 agent / proxy 的轻量路径供海量小租户复用连接，并在接入层按文件语义做路由与故障处理。
 - virtio 设备抽象 + 物理域/虚拟域分离的安全模型，是支持多租户云环境时数据访问凭证越权防护的自然延伸。
 
 ---
@@ -327,7 +327,7 @@
 | Octopus+ | ACM TOS 2021 | PM + RDMA | FS 镜像即共享持久内存池，零拷贝；大 IO 单边 RDMA client-active，自识别 RPC + collect-dispatch 事务 | Optane 停产；RDMA 路径设计仍是范式级参考 |
 | LineFS | SOSP 2021（Best Paper） | BlueField SmartNIC + PM | DFS 分解为 stage，流水线并行 offload 后台任务到 wimpy ARM 核，消除主机干扰 | BlueField 可得，PM 依赖是障碍；流水线 offload 方法论通用 |
 | DPFS | SYSTOR 2023 | BlueField-2 DPU | virtio-fs 把 FS 客户端整体虚拟化到 DPU，主机零修改，后端可插拔 | 硬件在售、代码开源（IBM/DPFS），工程可复现性最好之一 |
-| Fisc | FAST 2023 | 自研 DPU + RDMA | 轻客户端 + 存储感知无状态网关 + virtio-Fisc DPU 直通，云原生高密度接入 | 深度绑定阿里基础设施，不可复现；架构模式可借鉴 |
+| Fisc | FAST 2023 | 自研 DPU + RDMA | 轻客户端（DPU agent + 存储侧 proxy 两层聚合）+ 存储感知分布式网关 + virtio-Fisc DPU 直通，云原生高密度接入 | 深度绑定阿里基础设施，不可复现；架构模式可借鉴 |
 | SingularFS | ATC 2023 | PM + RDMA | 单元数据服务器极限优化：无日志原子元数据操作、分层并发控制 | Optane 停产削弱前提；单机元数据优化技术可移植 |
 | DAOS | SCFA 2020 / ISC 2023 Workshop | PM + NVMe（后转纯 NVMe）+ RDMA | 用户态 shared-nothing 栈，按 IO 尺寸分介质；后 PM 时代 Metadata-on-SSD | 开源、生产级（Aurora/IO500），社区活跃，可用性最高 |
 | Famfs | 内核补丁 + FAST 2025 poster | CXL 共享内存 | 多主机共享挂载的 fs-dax FS，单 Master + append-only 元数据日志 | 硬件（CXL switch 共享内存）未普及；代码开源，属前瞻布局 |
