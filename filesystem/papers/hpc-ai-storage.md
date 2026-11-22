@@ -140,17 +140,17 @@ AI 训练的 I/O 模式与传统 HPC 明显不同：
 
 ### 3.1 3FS（Fire-Flyer File System, DeepSeek）
 
-- **作者/机构**：DeepSeek-AI（幻方/High-Flyer 血统）；相关正式论文为 "Fire-Flyer AI-HPC: A Cost-Effective Software-Hardware Co-Design for Deep Learning"（An 等，作者列表待确认）
+- **作者/机构**：DeepSeek-AI（幻方/High-Flyer 血统）；相关正式论文为 "Fire-Flyer AI-HPC: A Cost-Effective Software-Hardware Co-Design for Deep Learning"（Wei An 等 52 位作者，DeepSeek-AI）
 - **会议年份**：Fire-Flyer AI-HPC 发表于 SC 2024（arXiv:2408.14158，其中描述 3FS 在整体软硬件栈中的角色）；3FS 本身于 2025-02 开源并发布设计文档（无独立会议论文，属技术报告/开源设计说明）
-- **链接**：<https://dl.acm.org/doi/10.1109/SC41406.2024.00089>；<https://arxiv.org/abs/2408.14158>；<https://github.com/deepseek-ai/3FS>
-- **目标负载**：AI 训练与推理的全链路存储：训练数据随机读、checkpoint 读写、KVCache 分层。设计上**几乎只为随机读带宽优化**，明确放弃读缓存。
+- **链接**：<https://dl.acm.org/doi/10.1109/SC41406.2024.00089>；<https://arxiv.org/abs/2408.14158>；<https://github.com/deepseek-ai/3FS>；逐节精读：[3fs-fireflyer-sc2024.md](3fs-fireflyer-sc2024.md)
+- **目标负载**：AI 训练与推理的全链路存储：训练数据随机读、checkpoint 读写、KVCache 分层。设计上**以聚合读带宽为第一目标**（客户端直连存储、读任意副本、USRBIO 零拷贝）。
 - **核心设计**：
   - **分离式（disaggregated）架构**：大量 NVMe SSD + RDMA 网络聚合为共享存储层；计算节点经 RDMA 零拷贝直读远端 NVMe。
   - **元数据放外部事务 KV**：元数据服务无状态，落在 FoundationDB（SSI 事务）上，元数据服务本身可水平扩展、随意重启。
   - **数据用 CRAQ 链式复制**：Chain Replication with Apportioned Queries 提供强一致读写分离，读可打散到链上任意副本，适配读多写少。
-  - **接口分层**：FUSE 便利接入 + 原生异步 API（USRBIO）绕 FUSE 获取全性能；训练数据用 FFRecord 打包格式，规避海量小文件的 per-file 开销。
-  - 明确不做读 cache（数据集远大于内存、随机访问缓存无益），把内存留给应用。
-- **关键结果**：生产部署 **180 个存储节点**（每节点 16×14 TiB NVMe、2×200 Gbps InfiniBand），聚合读带宽 **6.6 TiB/s**（另有资料称峰值 7.3 TB/s）；GraySort 基准 25 节点 3.66 TiB/min（待确认）；KVCache 读峰值 40 GiB/s（待确认）。支撑 DeepSeek-V3/R1 的训练与推理。
+  - **接口分层**：FUSE 便利接入 + 原生异步 API（USRBIO）绕 FUSE 获取全性能；（FFRecord 打包格式来自幻方 HFAiLab 生态，3FS 论文与设计说明未提及。）
+  - 面向训练负载做语义减法：不跟踪只读打开的 fd、文件长度最终一致（客户端每 5 秒上报写位置）、生产 stripe=200 并以链数提示加速小文件长度更新。
+- **关键结果**：生产部署 **180 个存储节点**（每节点 16×14 TiB NVMe、2×200 Gbps InfiniBand），聚合读带宽 **6.6 TiB/s**（README，500+ 客户端、带训练背景流量；SC'24 论文称实测总读吞吐 8 TB/s，条件未说明）；GraySort 基准 25 存储 + 50 计算节点 3.66 TiB/min（110.5 TiB / 30 分 14 秒）；KVCache 客户端读峰值 40 GiB/s。论文称 Fire-Flyer 2 支撑 DeepSeek 系列 LLM 训练。
 - **局限**：强依赖 RDMA 与高端 NVMe；FoundationDB 元数据路径的延迟与吞吐上限（每操作事务开销）在元数据密集场景可能成为瓶颈；FUSE 路径性能损失明显（官方以 USRBIO 弥补）；无会议论文，公开性能数据多为自述。
 - **设计启示**：
   - "无状态元数据 + 外部事务 KV"与"自研分片 Raft 元数据"是两条路线：前者省去自研共识与持久化，后者避免外部 FoundationDB 依赖，但要自己解决跨分片事务。
@@ -296,7 +296,7 @@ AI 训练的 I/O 模式与传统 HPC 明显不同：
 | UnifyFS | IPDPS 2023 | 节点本地存储聚合 / checkpoint | 用户态拦截，写本地读全局，lamination 可见性语义 |
 | GekkoFS（JCST 扩展版） | JCST 2020 | 单作业 ad-hoc burst buffer | 元数据/数据全 hash 去中心分布，放松目录语义换线性扩展 |
 | CHFS | HPC Asia 2022 | 节点本地 PMem ad-hoc FS | 文件系统完全构建于一致性 hash 分布式 KV 之上 |
-| 3FS / Fire-Flyer AI-HPC | SC 2024 + 2025 开源报告 | AI 训练/推理全链路存储 | RDMA 直读 NVMe，FoundationDB 无状态元数据，CRAQ 链复制，随机读优先、放弃读缓存 |
+| 3FS / Fire-Flyer AI-HPC | SC 2024 + 2025 开源报告 | AI 训练/推理全链路存储 | RDMA 直读 NVMe，FoundationDB 无状态元数据，CRAQ 链复制，读带宽优先 |
 | FalconFS | NSDI 2026 | DL 管道海量小文件 | 无状态客户端，服务端混合元数据索引 + 惰性命名空间复制，单 RPC lookup |
 | Tectonic-Shift | ATC 2023 | Meta ML 训练数据读 | HDD 容量层上加训练感知 flash 缓存层，优化 IO-per-watt（详见 industry 文档） |
 | Quiver | FAST 2020 | 训练数据集共享缓存 | 内容 hash 跨作业共享 + 可替代缓存命中 + 收益感知分配 |

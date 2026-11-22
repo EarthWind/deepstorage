@@ -35,6 +35,7 @@
 - [InfiniFS（FAST 2022）](infinifs-fast2022.md)：清华等提出的数据中心级元数据服务。覆盖阿里云盘古负载刻画、访问-内容解耦分区、基于出生三元组哈希的推测式路径解析（含 rename-list/back-pointer）、乐观访问元数据缓存与惰性失效、孤儿环与事务、因素分析与千亿文件评估。
 - [SingularFS（ATC 2023）](singularfs-atc2023.md)：清华用单台元数据服务器（Optane PM + RDMA）支撑十亿级文件。覆盖单机路线的规模论证、基于 btime/dtime 时间戳不变式的无日志元数据操作、写者/更新者/读者三级并发控制（cmpxchg16b 无锁时间戳）、NUMA 间与 NUMA 内的混合 inode 分区、惰性崩溃恢复，以及与 InfiniFS、CFS 的对照。
 - [Fisc（FAST 2023）](fisc-fast2023.md)：阿里巴巴面向云原生容器的文件系统接入层（后端为盘古）。覆盖重客户端与集中网络网关的问题刻画、两层功能聚合的轻量客户端（DPU agent + 存储侧 proxy）、文件粒度路由与存储感知故障处理、就近读、virtio-Fisc 设备与 FPGA 快路径、DPU 资源优化、vRPC 与端到端 QoS，以及评估数字中的不一致之处。
+- [3FS / Fire-Flyer（SC 2024 + 2025 开源设计说明）](3fs-fireflyer-sc2024.md)：DeepSeek 万卡 PCIe A100 集群与其文件系统。覆盖 PCIe + 单网卡 + 两层 Fat-Tree 双区的成本账、HFReduce/HaiScale、存算一体网络的防拥塞（SL/VL、静态路由、关闭 DCQCN、request-to-send）、无状态 meta + FoundationDB 键设计与文件长度维护、链表与 BIBD 恢复均衡布局、改造的 CRAQ、目标状态机与在线恢复、chunk 引擎、USRBIO、checkpoint 与 KVCache、一年硬件故障数据，以及性能数字口径核对。
 - [FalconFS（NSDI 2026）](falconfs-nsdi2026.md)：上交 IPADS 与华为面向深度学习流水线的分布式文件系统。覆盖自动驾驶 DL 负载刻画与"查找税"/瞬时倾斜两大挑战、无状态客户端架构、文件名哈希 + 选择性重定向的混合元数据索引（含 O(n log n) 例外表证明）、按需拉取 + 广播失效的惰性命名空间复制、锁与 WAL 的并发请求合并、基于 `LOOKUP_PARENT` 的 VFS shortcut，以及评估数字口径与表格笔误的说明。
 - [CFS（EuroSys 2023）](cfs-eurosys2023.md)：中科大与百度的全 POSIX 分布式文件系统元数据服务。覆盖锁开销实测、文件属性与命名空间层级的分层组织（TafDB 范围分区 + FileStore 哈希）、无 2PC 的跨层写入顺序与 GC、单分片原子原语与 delta apply / last-writer-wins 冲突合并、rename 快慢路径、去代理层，以及与 InfiniFS 的逐项对照。
 
