@@ -190,18 +190,19 @@ POSIX 语义要求逐级检查路径上每一级目录的存在性与权限。�
 
 ### 2.9 FalconFS: Distributed File System for Large-Scale Deep Learning Pipeline（NSDI 2026）
 
-- **作者/机构**：Jingwei Xu、Junbin Kang、Mingkai Dong、…、Haibo Chen 等 13 人，华为 + 上海交通大学 IPADS（分工待确认）
+- **作者/机构**：Jingwei Xu、Junbin Kang、Mingkai Dong、…、Haibo Chen 等 13 人，上海交通大学 IPADS + 华为；通讯作者 Mingkai Dong（上交）与 Junbin Kang（华为）
 - **会议/年份**：USENIX NSDI 2026（arXiv 2025 预印）
 - **链接**：https://www.usenix.org/conference/nsdi26/presentation/xu ；arXiv: https://arxiv.org/abs/2507.10367 （已开源）
+- **逐节精读**：[falconfs-nsdi2026.md](falconfs-nsdi2026.md)
 - **解决的问题**：深度学习流水线以海量小文件 + 巨量客户端为特征，客户端元数据缓存既低效（工作集太大、命中率低）又浪费训练节点内存。
 - **核心设计**：
   - **stateless client**：客户端不做元数据缓存，路径解析全部在服务端完成。
-  - **hybrid metadata indexing**：文件名 hash 分区到元数据节点（点查一跳直达），目录元数据集中/复制管理。
-  - **lazy namespace replication**：目录 namespace 惰性复制到所有元数据节点，使每个 MNode 都能本地完成路径解析；目录变更惰性失效。
+  - **hybrid metadata indexing**：文件 inode 按**文件名** hash 分区到元数据节点（客户端无需知道父目录即可一跳直达，同目录文件被打散）；热点文件名改用 `(pid, name)` hash（路径遍历重定向，多一跳），哈希方差用覆盖重定向指派节点；例外表最多 O(n log n) 项。
+  - **lazy namespace replication**：目录 dentry 复制到所有元数据节点，使每个 MNode 都能本地完成路径解析；mkdir 不广播、缺失时向属主按需拉取；rmdir/chmod 经协调者并广播失效（代替两阶段加锁），rename 由协调者做 2PL + 2PC。
   - **concurrent request merging**：合并并发请求提升服务端吞吐；VFS shortcut 简化部署。
   - **存储引擎**：MNode = 定制扩展的 **PostgreSQL**（复用其表/事务/B-link 树/WAL/主备复制）。
 - **关键实验结果**：对比 CephFS/Lustre，小文件读写吞吐最高 **5.72×**，模型训练吞吐最高 **12.81×**；在华为自动驾驶生产环境（**10,000 NPU**）稳定运行一年。
-- **局限性**：面向"目录数远小于文件数"的 AI 负载假设；namespace 复制在目录频繁变更的通用负载下失效开销大；rename 语义细节待确认。
+- **局限性**：面向"目录数远小于文件数"的 AI 负载假设；不维护目录 atime/mtime、不支持符号链接；rmdir 需广播到全部 MNode，吞吐随节点数增加而下降；readdir 需查询全部节点；扩缩容迁移期间停服。
 - **设计启示**：若目标场景含 AI 训练（海量小文件、超多客户端），"服务端解析 + 目录树全复制 + 文件按名 hash"是经生产验证的组合；且"用成熟单机数据库（PostgreSQL/RocksDB）当分片引擎"能省去自研存储引擎的大量工程量。
 
 ### 2.10 MesaFS: An I/O-Efficient Metadata Service for Distributed File Systems（EuroSys 2026）
@@ -256,7 +257,7 @@ POSIX 语义要求逐级检查路径上每一级目录的存在性与权限。�
 | FileScale (SoCC'23) | 三层：内存缓存 + DDBMS shared-nothing 分区 | 内存层快路径 | DDBMS 分布式 ACID 事务 | 分布式数据库（Calvin 谱系，待确认） | 小规模≈单机 HDFS；线性扩展 |
 | Mantle (SOSP'25) | TafDB 分片（全量）+ 每 namespace 单机 IndexNode（目录骨架） | IndexNode 单 RPC lookup | 环检测 offload 至 IndexNode；delta 更新 | TafDB | 100 亿对象/namespace；1.8M lookup/s；生产 2 年 |
 | HMFS (SoCC'25) | 无序（hash）索引 + 对象间链接维护目录语义 | hash 点查 | 待确认 | PM 上无序索引 + 链接结构 | 显著超有序索引方案（数字待确认） |
-| FalconFS (NSDI'26) | 文件按名 hash 分区；目录 namespace 惰性全复制 | 服务端本地解析（stateless client） | 惰性失效 + 服务端协调（细节待确认） | 定制 PostgreSQL（每 MNode） | 万卡 NPU 生产 1 年；训练吞吐至 12.81× |
+| FalconFS (NSDI'26) | 文件按名 hash 分区；目录 namespace 惰性全复制 | 服务端本地解析（stateless client） | 协调者 2PL + 2PC，广播失效 dentry 副本 | 定制 PostgreSQL（每 MNode） | 万卡 NPU 生产 1 年；训练吞吐至 12.81× |
 | MesaFS (EuroSys'26) | 单引擎层工作（不改分区） | — | —（不变式感知恢复） | SSD 半有序布局，单次写更新 | 62–95.1% 裸 SSD 性能 |
 | SwitchFS (EuroSys'26) | 常规分区 + 交换机跟踪目录状态 | 常规 | 异步 delta，读时合并 | —（协调面创新） | 争用下延迟/吞吐显著改善（待确认） |
 

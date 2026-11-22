@@ -161,14 +161,14 @@ AI 训练的 I/O 模式与传统 HPC 明显不同：
 
 - **作者/机构**：Jingwei Xu 等，上海交通大学 与 华为（含华为自动驾驶业务）
 - **会议年份**：USENIX NSDI 2026（arXiv:2507.10367，2025-07 公开）
-- **链接**：<https://www.usenix.org/conference/nsdi26/presentation/xu>；<https://arxiv.org/abs/2507.10367>；<https://github.com/falcon-infra/falconfs>
+- **链接**：<https://www.usenix.org/conference/nsdi26/presentation/xu>；<https://arxiv.org/abs/2507.10367>；<https://github.com/falcon-infra/falconfs>；逐节精读：[falconfs-nsdi2026.md](falconfs-nsdi2026.md)
 - **目标负载**：深度学习数据管道的海量小文件：数据采集、预处理、训练全流程的高并发小文件读写与元数据密集访问。
 - **核心设计**：
   - **无状态客户端（stateless client）**：核心观察是 DL 管道中客户端缓存（dentry/元数据缓存）命中率极低还白耗内存——于是干脆取消客户端状态，路径解析全部推到服务端。
   - **服务端混合元数据索引（hybrid metadata indexing）**：文件名 hash 分布 + 目录路径的服务端解析，单次 RPC 完成 lookup，避免逐级路径遍历。
   - **惰性命名空间复制（lazy namespace replication）**：目录结构在元数据节点间按需惰性复制，使各节点能本地完成路径解析，同时保持目录变更代价可控。
 - **关键结果**：对比 CephFS 与 Lustre：小文件读写吞吐最高 **5.72×**，DL 模型训练吞吐最高 **12.81×**；已在华为自动驾驶生产环境（**10,000 NPU** 集群）运行一年，已开源。
-- **局限**：面向"路径已知、直接 open"的负载，目录枚举/rename 类操作非重点；hash 分布对超大目录/热点目录的均衡有代价（细节待确认）。
+- **局限**：面向"路径已知、直接 open"的负载，rmdir/rename/chmod 经协调者广播、readdir 需查询全部节点；按文件名 hash 时热点文件名（如每个目录都有的 `map.json`）需靠例外表重定向，多一跳；不维护目录 atime/mtime、不支持符号链接。
 - **设计启示**：
   - 按 key 范围分片保目录局部性的元数据设计，路径解析仍需逐级（父目录 → dentry → inode）；FalconFS 证明 AI 负载下**单 RPC lookup** 收益巨大——可在元数据服务增加"全路径 → inode"的辅助索引或服务端路径解析代理，作为 AI 场景 fast-path。
   - "无状态客户端"提示 SDK 设计：对训练负载默认关闭元数据缓存、改为服务端批量 lookup（如 open 一个 manifest 内全部文件），比在客户端堆缓存更有效。
