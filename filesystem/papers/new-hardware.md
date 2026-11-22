@@ -191,20 +191,21 @@
 
 - **会议**：USENIX ATC 2023
 - **作者/机构**：Hao Guo、Youyou Lu、Wenhao Lv、Xiaojian Liao、Shaoxun Zeng、Jiwu Shu（清华大学）
-- **链接**：https://www.usenix.org/conference/atc23/presentation/guo
+- **链接**：https://www.usenix.org/conference/atc23/presentation/guo ；逐节精读：[singularfs-atc2023.md](singularfs-atc2023.md)
 - **目标硬件**：Intel Optane PMem（元数据持久化）+ RDMA
 
 ### 核心设计
 
 - 命题：借助新硬件把**单元数据服务器**的性能推到极致（数百万 ops/s、十亿级文件），从而让绝大多数集群不再需要复杂的分布式元数据。
 - 元数据全部存放于单服务器的 PM（NVMM）上；核心技术：
-  - **无日志元数据操作**：利用 PM 字节寻址与 8 字节原子写，把常见元数据操作（create/unlink/stat）构造为无需 WAL 的 crash-consistent 更新。
-  - **分层并发控制**：区分目录项与 inode 的并发粒度，目录时间戳等热点用原子指令更新，避免目录锁竞争。
+  - **无日志元数据操作**：不依赖 PM 的原子写，而是利用 KV 后端的单对象原子性 + 父目录时间戳与子 inode btime/dtime 的单调不变式，按固定顺序完成 create/delete/mkdir/rmdir，崩溃后在访问时惰性修复；只有 rename 保留日志。
+  - **分层并发控制**：写者用每 inode 读写锁；只推进父目录 ctime/mtime 的"更新者"之间用 16 字节 `cmpxchg16b` 无锁取 max；读者以 ctime 为版本号乐观校验，避免共享目录锁竞争。
+  - **混合 inode 分区**：按"目录时间戳 + 子项"分组到 NUMA 节点保证局部性，NUMA 内再哈希到多个 P-Masstree 索引缓解锁竞争。
   - RDMA 网络路径压低单次操作延迟。
 
 ### 关键实验结果
 
-- 单元数据服务器达到十亿级文件规模与百万级 ops/s 量级的元数据吞吐（论文报告显著超越 CephFS/HopsFS 等分布式元数据系统的单组性能）。
+- 单台元数据服务器 create/stat 达 8.36M/18.80M ops/s；每 NUMA 节点容纳 17.5 亿文件且吞吐稳定；私有目录 create 为 InfiniFS 的 22.49×、file stat 为 CephFS 的 7.54×（每 NUMA 比较）。
 
 ### 局限
 

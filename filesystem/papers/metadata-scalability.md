@@ -121,12 +121,13 @@ POSIX 语义要求逐级检查路径上每一级目录的存在性与权限。�
 - **链接**：https://www.usenix.org/conference/atc23/presentation/guo （PDF: https://www.usenix.org/system/files/atc23-guo.pdf）
 - **解决的问题**：反向思路——与其分布式扩展，不如用新硬件（持久内存 PM + RDMA）把**单台元数据服务器**的性能推到十亿级文件规模，从根本上回避分布式事务与分区问题。
 - **核心设计**：
-  - **log-free metadata operations**：利用 PM 的 8 字节原子写与操作排序，使大多数元数据操作无需 journal/log 即可崩溃一致，消除写放大。
-  - **hierarchical concurrency control**：按"目录 inode / 子项"层级设计并发控制，目录 timestamp 等共享字段用原子指令更新，最大化同目录并发（如高并发 create）。
-  - **hybrid inode partition**：在服务器内部（多核/NUMA 间）混合划分 inode 以均衡负载（细节待确认）。
-  - **存储引擎**：NVMM（Intel Optane PM）上的自研内存结构，RDMA 网络。
-- **关键实验结果**：单 MDS 支撑 **10 亿级文件**；吞吐显著超过多节点部署的分布式 MDS 基线（具体倍数待确认，论文摘要称大幅优于现有系统）。
-- **局限性**：容量与吞吐终有单机上限；依赖 Optane PM（已停产，需以 CXL 内存/高速 NVMe 替代验证）；单点容错依赖主备复制。
+  - **log-free metadata operations**：不依赖 PM 原子写或 KV 事务，而是利用 KV 后端的单对象原子性 + inode 新增的 btime/dtime 字段与不变式 `父.ctime ≥ max(子.btime, 子.dtime)`：create 先插子 inode 再推进父时间戳，delete 先标记失效、再推进父时间戳、最后物理删除；崩溃后按不变式在访问时惰性修复。dirent 与子 inode 合并为一个 KV 对象（键 `<父 ID + 名字>`），readdir 用前缀匹配。rename 仍用日志 + 严格 2PL（日志 inode 数从 4 降到 2）。
+  - **hierarchical concurrency control**：把操作分为写者（每 inode 读写锁的写锁）、更新者（只推进父目录 ctime/mtime，彼此用 16 字节 `cmpxchg16b` 无锁取 max）、读者（以 ctime 为版本号做乐观校验）；更新者与读者只拿读锁，最大化同目录并发 create/delete。
+  - **hybrid inode partition**：NUMA 间——目录拆成时间戳元数据与访问元数据，"目录时间戳 + 子文件 inode + 子目录访问元数据"组成元数据组，按一致性哈希放到 NUMA 节点，保证文件操作的 NUMA 局部性（与 InfiniFS 的访问/内容拆分同构）；NUMA 内——按键哈希到 n 个有序索引（实验 n = 8）缓解公共前缀锁竞争，并用 `num_dents` 计数代替 rmdir 的前缀扫描。
+  - **存储引擎**：通用非事务 KV（实现用 P-Masstree）跑在 Intel Optane PM 上；RDMA 网络；数据用对象存储，键 `<inode ID + 块号>`。
+- **关键实验结果**：单台元数据服务器（2 个 NUMA 节点、8 × 128 GB Optane）create/stat 达 **8.36M / 18.80M ops/s**；私有目录 create/delete 为 InfiniFS 的 22.49×/23.57×（每 NUMA 比较）；共享目录 create/delete 至少高 7.76×/5.61×，整机收敛到约 4M ops/s（单目录受限于一个 NUMA 节点）；每 NUMA 节点容纳 **17.5 亿**文件，create/stat 稳定在约 4.40M/9.10M ops/s；惰性恢复启动时间 0 s（全树扫描 1 亿文件需 32.1 s）。
+- **局限性**：容量与吞吐终有单机上限；依赖 Optane PM（已停产，需以 CXL 内存/高速 NVMe 替代验证）；论文**未讨论高可用**（复制、主备切换），也没有支撑"不牺牲多服务器扩展性"的设计或实验；mkdir/rmdir 吞吐低于 NOVA；重启后大目录首次访问要扫描全部子项。
+- **逐节精读**：[singularfs-atc2023.md](singularfs-atc2023.md)
 - **设计启示**：若目标规模 ≤ 数十亿文件，"单个高性能元数据服务器 + 主备复制"可能比分布式元数据简单一个数量级。log-free + 层级并发控制的思想在 DRAM+NVMe 组合下同样适用：能用原子指令/单点顺序写解决的，不要用锁和 journal。
 
 ### 2.5 λFS: A Scalable and Elastic Distributed File System Metadata Service using Serverless Functions（ASPLOS 2023）
@@ -189,18 +190,19 @@ POSIX 语义要求逐级检查路径上每一级目录的存在性与权限。�
 
 ### 2.9 FalconFS: Distributed File System for Large-Scale Deep Learning Pipeline（NSDI 2026）
 
-- **作者/机构**：Jingwei Xu、Junbin Kang、Mingkai Dong、…、Haibo Chen 等 13 人，华为 + 上海交通大学 IPADS（分工待确认）
+- **作者/机构**：Jingwei Xu、Junbin Kang、Mingkai Dong、…、Haibo Chen 等 13 人，上海交通大学 IPADS + 华为；通讯作者 Mingkai Dong（上交）与 Junbin Kang（华为）
 - **会议/年份**：USENIX NSDI 2026（arXiv 2025 预印）
 - **链接**：https://www.usenix.org/conference/nsdi26/presentation/xu ；arXiv: https://arxiv.org/abs/2507.10367 （已开源）
+- **逐节精读**：[falconfs-nsdi2026.md](falconfs-nsdi2026.md)
 - **解决的问题**：深度学习流水线以海量小文件 + 巨量客户端为特征，客户端元数据缓存既低效（工作集太大、命中率低）又浪费训练节点内存。
 - **核心设计**：
   - **stateless client**：客户端不做元数据缓存，路径解析全部在服务端完成。
-  - **hybrid metadata indexing**：文件名 hash 分区到元数据节点（点查一跳直达），目录元数据集中/复制管理。
-  - **lazy namespace replication**：目录 namespace 惰性复制到所有元数据节点，使每个 MNode 都能本地完成路径解析；目录变更惰性失效。
+  - **hybrid metadata indexing**：文件 inode 按**文件名** hash 分区到元数据节点（客户端无需知道父目录即可一跳直达，同目录文件被打散）；热点文件名改用 `(pid, name)` hash（路径遍历重定向，多一跳），哈希方差用覆盖重定向指派节点；例外表最多 O(n log n) 项。
+  - **lazy namespace replication**：目录 dentry 复制到所有元数据节点，使每个 MNode 都能本地完成路径解析；mkdir 不广播、缺失时向属主按需拉取；rmdir/chmod 经协调者并广播失效（代替两阶段加锁），rename 由协调者做 2PL + 2PC。
   - **concurrent request merging**：合并并发请求提升服务端吞吐；VFS shortcut 简化部署。
   - **存储引擎**：MNode = 定制扩展的 **PostgreSQL**（复用其表/事务/B-link 树/WAL/主备复制）。
 - **关键实验结果**：对比 CephFS/Lustre，小文件读写吞吐最高 **5.72×**，模型训练吞吐最高 **12.81×**；在华为自动驾驶生产环境（**10,000 NPU**）稳定运行一年。
-- **局限性**：面向"目录数远小于文件数"的 AI 负载假设；namespace 复制在目录频繁变更的通用负载下失效开销大；rename 语义细节待确认。
+- **局限性**：面向"目录数远小于文件数"的 AI 负载假设；不维护目录 atime/mtime、不支持符号链接；rmdir 需广播到全部 MNode，吞吐随节点数增加而下降；readdir 需查询全部节点；扩缩容迁移期间停服。
 - **设计启示**：若目标场景含 AI 训练（海量小文件、超多客户端），"服务端解析 + 目录树全复制 + 文件按名 hash"是经生产验证的组合；且"用成熟单机数据库（PostgreSQL/RocksDB）当分片引擎"能省去自研存储引擎的大量工程量。
 
 ### 2.10 MesaFS: An I/O-Efficient Metadata Service for Distributed File Systems（EuroSys 2026）
@@ -250,12 +252,12 @@ POSIX 语义要求逐级检查路径上每一级目录的存在性与权限。�
 | Tectonic (FAST'21) | 三层（name/file/block）各按 ID hash 分区 | 逐级 lookup，目录项同分片 | 跨分片不保证原子（语义取舍） | ZippyDB（分片事务 KV / RocksDB） | EB 级数据，数十亿文件，生产 |
 | InfiniFS (FAST'22) | access/content 元数据解耦，按目录 hash 分组 | speculative 并行解析 + 客户端乐观缓存 | 文件 rename 2PC；目录 rename 经中心协调者防环 + 广播失效 | RocksDB（每台元数据服务器） | 1000 亿文件；73× vs HopsFS |
 | CFS (EuroSys'23) | 属性与 namespace 分层：TafDB（按父 id 范围分区）+ FileStore（按 id 哈希） | 客户端逐级 lookup，单级单分片 | 同目录文件 rename 单分片快路径；其余 Renamer 加锁 + 2PC | TafDB + FileStore（RocksDB） | 生产 3 年；50 节点 1.22–4.10× vs InfiniFS |
-| SingularFS (ATC'23) | 不分区（单 MDS，机内 hybrid inode partition） | 单机内存解析 | 单机事务，无分布式协调 | NVMM（Optane PM）+ RDMA | 10 亿级文件 / 单服务器 |
+| SingularFS (ATC'23) | 不分区（单 MDS，机内 hybrid inode partition：NUMA 间按目录组、NUMA 内按键哈希） | 逐级 lookup + 客户端目录元数据缓存 | 日志（2 个 inode）+ 严格 2PL，无分布式协调 | P-Masstree on Optane PM + RDMA | 每 NUMA 17.5 亿文件；单机 create 8.36M ops/s |
 | λFS (ASPLOS'23) | serverless 函数一致性 hash 路由 + 函数内缓存 | 函数内缓存解析，未命中查 DB | 底层 NewSQL 分布式事务 | MySQL NDB Cluster | 弹性伸缩；优于 HopsFS（负载相关） |
 | FileScale (SoCC'23) | 三层：内存缓存 + DDBMS shared-nothing 分区 | 内存层快路径 | DDBMS 分布式 ACID 事务 | 分布式数据库（Calvin 谱系，待确认） | 小规模≈单机 HDFS；线性扩展 |
 | Mantle (SOSP'25) | TafDB 分片（全量）+ 每 namespace 单机 IndexNode（目录骨架） | IndexNode 单 RPC lookup | 环检测 offload 至 IndexNode；delta 更新 | TafDB | 100 亿对象/namespace；1.8M lookup/s；生产 2 年 |
 | HMFS (SoCC'25) | 无序（hash）索引 + 对象间链接维护目录语义 | hash 点查 | 待确认 | PM 上无序索引 + 链接结构 | 显著超有序索引方案（数字待确认） |
-| FalconFS (NSDI'26) | 文件按名 hash 分区；目录 namespace 惰性全复制 | 服务端本地解析（stateless client） | 惰性失效 + 服务端协调（细节待确认） | 定制 PostgreSQL（每 MNode） | 万卡 NPU 生产 1 年；训练吞吐至 12.81× |
+| FalconFS (NSDI'26) | 文件按名 hash 分区；目录 namespace 惰性全复制 | 服务端本地解析（stateless client） | 协调者 2PL + 2PC，广播失效 dentry 副本 | 定制 PostgreSQL（每 MNode） | 万卡 NPU 生产 1 年；训练吞吐至 12.81× |
 | MesaFS (EuroSys'26) | 单引擎层工作（不改分区） | — | —（不变式感知恢复） | SSD 半有序布局，单次写更新 | 62–95.1% 裸 SSD 性能 |
 | SwitchFS (EuroSys'26) | 常规分区 + 交换机跟踪目录状态 | 常规 | 异步 delta，读时合并 | —（协调面创新） | 争用下延迟/吞吐显著改善（待确认） |
 

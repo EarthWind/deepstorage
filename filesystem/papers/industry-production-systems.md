@@ -263,9 +263,10 @@ Pangu 是阿里统一存储底座（支撑 EBS、OSS、NAS、数据库、MaxComp
 ## 8. Huawei FalconFS（NSDI 2026）
 
 - **论文标题**：FalconFS: Distributed File System for Large-Scale Deep Learning Pipeline
-- **作者/机构**：Jingwei Xu、Junbin Kang 等，Huawei（与高校合作，具体分工待确认）
+- **作者/机构**：Jingwei Xu、Junbin Kang 等，上海交通大学 IPADS 与 Huawei
 - **会议与年份**：已被 **USENIX NSDI 2026** 接收（<https://www.usenix.org/conference/nsdi26/presentation/xu>）；预印本 arXiv:2507.10367（2025-07）
 - **论文链接**：<https://arxiv.org/abs/2507.10367>
+- **逐节精读**：[falconfs-nsdi2026.md](falconfs-nsdi2026.md)
 
 ### 解决的问题
 
