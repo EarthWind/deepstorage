@@ -231,7 +231,7 @@ Pangu 是阿里统一存储底座（支撑 EBS、OSS、NAS、数据库、MaxComp
 
 #### 与存储相关的内容
 
-论文将 3FS 作为集群存储底座描述（NVMe SSD + RDMA 网络的全闪分布式文件系统），承担训练数据读取与 checkpoint。3FS 的完整架构细节在论文中篇幅有限，更多见开源项目文档。
+论文 §VI-B 用约一栏描述 3FS：180 台存储节点（每台 16 块 NVMe、2 × 200 Gbps IB，理论出口 9 TB/s、称实测读 8 TB/s）、四组件架构、inode 表 + 目录项表的 KV 元数据、CRAQ 链复制，以及为抑制客户端 incast 设计的 request-to-send 流控；§VI-A 讲存储流量与训练通信在同一网络中的 SL/VL 隔离，§VII-A 讲基于 3FS 批量写的 checkpoint（>10 GiB/s/节点）。更多细节见开源设计说明。逐节精读（论文 + 设计说明）：[3fs-fireflyer-sc2024.md](3fs-fireflyer-sc2024.md)
 
 ### 7.2 3FS（Fire-Flyer File System，开源项目，2025-02）
 
@@ -243,7 +243,7 @@ Pangu 是阿里统一存储底座（支撑 EBS、OSS、NAS、数据库、MaxComp
 - **四组件**：cluster manager（集群管理/成员心跳）、metadata service、storage service、client；存算分离（disaggregated）架构聚合数千块 NVMe SSD 的吞吐与数百节点的 RDMA 网络带宽；
 - **元数据**：**无状态 metadata service**，元数据存放于事务型分布式 KV 存储 **FoundationDB**，文件系统语义（目录树、inode）映射为 KV 事务，metadata 节点可任意水平扩展与替换；
 - **数据路径与一致性**：数据分 chunk，采用 **CRAQ（Chain Replication with Apportioned Queries）** 链式复制实现强一致，写走链头到链尾、读可分摊到链上各节点（read scaling），语义上提供 strong consistency 简化上层应用；
-- **接口**：提供 FUSE 挂载与原生高性能客户端（USRBIO 用户态异步 IO API），面向 AI 场景提供 FFRecord 数据格式与 **KVCache**（LLM 推理 KV 缓存下沉到 3FS，替代 DRAM 缓存）。
+- **接口**：提供 FUSE 挂载与原生高性能客户端（USRBIO 用户态异步 IO API），面向 AI 场景支撑 **KVCache**（LLM 推理 KV 缓存下沉到 3FS，替代 DRAM 缓存；论文称由构建在 3FS 上的 3FS-KV 支撑）。注：FFRecord 是幻方 HFAiLab 生态的数据格式，3FS 论文与设计说明均未提及。
 
 #### 关键性能数据（官方公布）
 

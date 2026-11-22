@@ -33,7 +33,7 @@
 ### 1.4 NVMe / NVMe-oF：介质快到文件系统必须让路
 
 - PCIe 4.0/5.0 NVMe SSD 单盘 7-14 GB/s、百万级 IOPS；NVMe-oF 让远端 SSD 延迟只比本地高 ~10μs。
-- 影响：用户态 IO 栈（SPDK）、每盘单线程 shared-nothing 引擎（DAOS）、"读缓存无用论"（3FS 认为 AI 随机读场景下缓存命中率低，干脆放弃缓存换取全盘随机读带宽）。
+- 影响：用户态 IO 栈（SPDK）、每盘单线程 shared-nothing 引擎（DAOS）、不依赖读缓存、直接压榨全闪随机读带宽的路线（3FS 以 USRBIO 零拷贝直读 + 全副本读分摊带宽；注意 3FS 论文与设计说明并未明确写出"放弃读缓存"的结论）。
 - 商业系统 VAST Data 基于 NVMe-oF 的 DASE（Disaggregated Shared-Everything）架构是该方向的工业代表，但**没有同行评审论文**，只有白皮书（本文按任务要求标注，不设独立章节）。
 
 ### 1.5 CXL：下一个周期的"共享存储介质"
@@ -281,7 +281,7 @@
 
 - **发表形态**：DeepSeek 2025 年 2 月开源（github.com/deepseek-ai/3FS）+ 设计文档/技术报告；其集群背景见 arXiv:2408.14158 "Fire-Flyer AI-HPC"。**非同行评审论文**，此处收录因其为 2020 后 RDMA+NVMe DFS 最有影响力的工业实现之一
 - **机构**：DeepSeek（深度求索）
-- **链接**：https://github.com/deepseek-ai/3FS
+- **链接**：https://github.com/deepseek-ai/3FS ；逐节精读：[3fs-fireflyer-sc2024.md](3fs-fireflyer-sc2024.md)
 - **目标硬件**：大规模 NVMe SSD 池（180 存储节点、数千 SSD）+ 200/400G InfiniBand RDMA
 
 ### 核心设计
@@ -289,12 +289,12 @@
 - 面向 AI 训练/推理 IO 特征（海量并发随机读、checkpoint 大写、KVCache）：
   - **分离式架构**：cluster manager + 元数据服务（无状态，元数据存 FoundationDB 事务型 KV）+ 存储服务（chunk 引擎）+ 客户端（FUSE 及原生 API）。
   - **数据路径**：RDMA 优先、零拷贝、kernel bypass；链式复制 CRAQ（Chain Replication with Apportioned Queries）提供强一致读写分流——写走链头到链尾，读可打到任意副本。
-  - **放弃读缓存**：认为 AI 随机读命中率低，直接压榨全盘随机读 IOPS/带宽，简化一致性。
+  - **不依赖读缓存**：README 称支持跨计算节点随机访问训练样本，免去预取或打乱数据集；数据路径以 USRBIO 零拷贝直读和全副本读分摊带宽为主（"放弃读缓存"并非论文或设计说明的原话）。
 - FUSE 之外提供绕过 FUSE 瓶颈的原生客户端 API（USRBIO）。
 
 ### 关键实验结果（官方报告）
 
-- 180 节点集群聚合读吞吐 6.6 TiB/s；GraySort 110.5 TiB / 30 分钟（3.66 TiB/min）；KVCache 读峰值 40+ GiB/s。
+- 180 节点集群聚合读吞吐 6.6 TiB/s（带训练背景流量；SC'24 论文另称实测 8 TB/s，条件未说明）；GraySort 110.5 TiB / 30 分钟（3.66 TiB/min）；KVCache 读峰值 40+ GiB/s。
 
 ### 局限
 
@@ -304,7 +304,7 @@
 
 - 3FS 是分离式架构最直接的开源对标物。一个值得研究的分岔：用"通用事务 KV（FoundationDB）承载元数据"换开发速度，还是用"自研分片 multi-raft 元数据"换极限规模与可控性——3FS 的实践检验了前者在数千客户端下的可行性边界。
 - CRAQ 的"任意副本可读"与追加写、密封后只读的数据布局互补：密封后的数据天然任意副本可读，仍在写入中的数据可借鉴 CRAQ 读分流。
-- "为 AI 场景砍读缓存"提醒设计者：缓存策略应按 workload 画像可配置，而非固定设计。
+- 3FS 不靠缓存、而靠全副本读与 RDMA 直读拿带宽，提醒设计者：缓存策略应按 workload 画像可配置，而非固定设计。
 
 ---
 
@@ -332,7 +332,7 @@
 | SingularFS | ATC 2023 | PM + RDMA | 单元数据服务器极限优化：无日志原子元数据操作、分层并发控制 | Optane 停产削弱前提；单机元数据优化技术可移植 |
 | DAOS | SCFA 2020 / ISC 2023 Workshop | PM + NVMe（后转纯 NVMe）+ RDMA | 用户态 shared-nothing 栈，按 IO 尺寸分介质；后 PM 时代 Metadata-on-SSD | 开源、生产级（Aurora/IO500），社区活跃，可用性最高 |
 | Famfs | 内核补丁 + FAST 2025 poster | CXL 共享内存 | 多主机共享挂载的 fs-dax FS，单 Master + append-only 元数据日志 | 硬件（CXL switch 共享内存）未普及；代码开源，属前瞻布局 |
-| 3FS | 开源技术报告 2025（非评审） | NVMe 池 + RDMA | FoundationDB 元数据 + CRAQ 链复制 + 无读缓存，AI workload 特化 | 开源可部署，工业验证充分；数字为自报 |
+| 3FS | 开源技术报告 2025（非评审） | NVMe 池 + RDMA | FoundationDB 元数据 + CRAQ 链复制 + USRBIO 零拷贝直读，AI workload 特化 | 开源可部署，工业验证充分；数字为自报 |
 | DPC（客户端） | ICPP 2024 | DPU | DFS 客户端卸载至 DPU | 论文级原型 |
 | SwitchFS | EuroSys 2026 | 可编程交换机 | 网内协调的异步元数据更新 | 依赖 P4 交换机，原型阶段 |
 | VAST Data | 无论文（白皮书） | NVMe-oF + SCM | DASE 分列共享架构 | 商业闭源，标注：无同行评审论文 |
