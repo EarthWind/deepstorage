@@ -729,4 +729,4 @@ flowchart LR
 - Satadru Pan et al. *Facebook's Tectonic Filesystem: Efficiency from Exascale*. USENIX FAST 2021. 本仓库精读：[tectonic-fast2021.md](tectonic-fast2021.md)
 - Daniel E. Eisenbud et al. *Maglev: A Fast and Reliable Software Network Load Balancer*. NSDI 2016.
 - Jongyul Kim et al. *LineFS: Efficient SmartNIC Offload of a Distributed File System with Pipeline Parallelism*. SOSP 2021. 见[新硬件综述](new-hardware.md)
-- Peter-Jan Gootzen et al. *DPFS: DPU-Powered File System Virtualization*. SYSTOR 2023. 见[客户端与通用技术](client-and-general-techniques.md)
+- Peter-Jan Gootzen et al. *DPFS: DPU-Powered File System Virtualization*. SYSTOR 2023. 本仓库精读：[dpfs-systor2023.md](dpfs-systor2023.md)

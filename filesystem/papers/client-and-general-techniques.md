@@ -52,12 +52,12 @@ FUSE 是分布式文件系统挂载 POSIX 接口最常见的途径（CephFS、Gl
 
 ### 1.5 DPFS: DPU-Powered File System Virtualization
 
-- **作者/机构**：Peter-Jan Gootzen 等（IBM Research 与 VU Amsterdam 等）
+- **作者/机构**：Peter-Jan Gootzen、Jonas Pfefferle、Radu Stoica（IBM Research）、Animesh Trivedi（VU Amsterdam）
 - **会议年份**：ACM SYSTOR 2023
-- **链接**：<https://dl.acm.org/doi/10.1145/3579370.3594769>
+- **链接**：<https://dl.acm.org/doi/10.1145/3579370.3594769>；逐节精读：[dpfs-systor2023.md](dpfs-systor2023.md)
 - **问题**：虚拟化/多租户环境中，宿主机上的文件系统客户端消耗 CPU 且暴露攻击面。
 - **核心设计**：用 DPU 承载 virtio-fs 后端，将文件系统客户端（如 NFS 客户端）完全运行在 DPU 上，主机侧仅通过 virtio-fs 队列与之交互，实现主机零客户端代码。
-- **关键结果**：以极低的主机 CPU 占用提供接近原生的文件系统访问性能（具体数字待确认）。
+- **关键结果**：主机每 I/O 内核态 CPU 周期为内核 NFS 客户端的 1/4.4（指令数 −62.8%，IPC 0.57→0.94；DPU 侧周期未计入）；框架基础延迟约 40 µs，4 KiB 峰值 327K 读 IOPS；I/O 深度 ≥4 时吞吐比主机 NFS 高 12%–32%，但深度 ≤3 时低 11%–21%，单次 4 KiB 读延迟 91.5 µs vs 71.2 µs。受单 virtio 队列、队列深度 ≤16 和 BlueField-2 ARM 核性能限制。
 - **设计启示**：与 Fisc 同方向的佐证：virtio-fs 是"FUSE 语义 + 硬件队列"的标准化形态。客户端协议若保持简洁（请求/响应无复杂本地状态），未来迁移到 DPU/virtio-fs 形态的成本会低得多。
 
 ---

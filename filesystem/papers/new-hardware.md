@@ -134,18 +134,18 @@
 
 - **会议**：SYSTOR 2023（ACM International Conference on Systems and Storage）
 - **作者/机构**：Peter-Jan Gootzen（IBM Research Zurich / VU Amsterdam）、Jonas Pfefferle、Radu Stoica（IBM Research）、Animesh Trivedi（VU Amsterdam）
-- **链接**：https://dl.acm.org/doi/10.1145/3579370.3594769 ；代码 https://github.com/IBM/DPFS
+- **链接**：https://dl.acm.org/doi/10.1145/3579370.3594769 ；代码 https://github.com/IBM/DPFS ；逐节精读：[dpfs-systor2023.md](dpfs-systor2023.md)
 - **目标硬件**：NVIDIA BlueField-2 DPU，virtio-fs 硬件模拟能力
 
 ### 核心设计
 
 - 主张云场景下**文件系统客户端与后端实现解耦**：主机（租户）只看到标准 virtio-fs 设备，完整的文件系统客户端运行在 DPU 的 ARM 核上，由云厂商管理与优化。
-- **数据路径**：主机 VFS → 轻量 FUSE 层生成 FUSE 请求 → virtio queue 经 PCIe（SR-IOV 虚拟功能支持多租户）→ DPU 上的 DPFS 框架解析 FUSE 请求 → 后端（NFS 客户端、KV、镜像后端等可插拔）访问远端存储。
+- **数据路径**：主机 VFS → 轻量 FUSE 层生成 FUSE 请求 → virtio queue 经 PCIe → DPU 上的 DPFS 框架（DPFS-HAL 轮询 + DPFS-FUSE 类 libfuse 异步 API）解析 FUSE 请求 → 可插拔后端（论文实现了 null、NFS（libnfs + XLIO）、RAMCloud KV 三个）访问远端存储。基于 SR-IOV 的多租户在论文中仍是进行中的工作。
 - 主机侧零配置、零软件修改（Linux 自带 virtio-fs 驱动即可），裸金属/VM 统一接入；后端可针对 workload/硬件做厂商侧优化。
 
 ### 关键实验结果
 
-- 每 IO 的主机 CPU 效率提高 4.4×（CPU 周期从主机转移到 DPU）；吞吐/延迟与主机侧运行的对照组相当；揭示 BlueField-2 上 virtio-fs offload 的延迟构成（PCIe DMA、ARM 处理）。
+- 每 IO 的主机内核态 CPU 周期降为 1/4.4（CPU 周期从主机转移到 DPU，DPU 侧未计入）；对比主机内核 NFS 客户端：I/O 深度 ≥4 时吞吐高 12%–32%，深度 ≤3 时低 11%–21%；4 KiB 读延迟 91.5 µs（其中 DPU 框架开销 38.6 µs、DPU 上用户态 NFS 52.9 µs）vs 主机 NFS 71.2 µs。
 
 ### 局限
 
