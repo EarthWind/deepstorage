@@ -318,11 +318,11 @@ Pangu 是阿里统一存储底座（支撑 EBS、OSS、NAS、PolarDB、MaxComput
 - **论文标题**：CacheSack: Admission Optimization for Google Datacenter Flash Caches
 - **作者/机构**：Tzu-Wei Yang 等，Google
 - **会议与年份**：USENIX ATC 2022（期刊扩展版：ACM Transactions on Storage 2023，《CacheSack: Theory and Experience of Google's Admission Optimization for Datacenter Flash Caches》）
-- **论文链接**：<https://www.usenix.org/conference/atc22/presentation/yang-tzu-wei>；<https://dl.acm.org/doi/10.1145/3582014>
+- **论文链接**：<https://www.usenix.org/conference/atc22/presentation/yang-tzu-wei>；<https://dl.acm.org/doi/10.1145/3582014>；逐节精读（依据 ATC 会议版）：[cachesack-atc2022.md](cachesack-atc2022.md)
 
 #### 内容与结果
 
-CacheSack 是 **Colossus Flash Cache**（Colossus 的通用 flash 缓存服务）的准入算法：把缓存流量划分为不相交类别，对每类评估缓存收益，将"给每类分配何种准入策略"建模为背包问题求最优解，目标是最小化 HDD 磁盘 IO 与 flash 损耗两大主导成本。生产结果：**TCO 降低 7.7%、磁盘读降低 9.5%、flash 磨损降低 17.8%**。这是 2020 年后少有的透露 Colossus 生产细节的同行评审论文。
+CacheSack 是 **Colossus Flash Cache**（Colossus 的通用 flash 缓存服务）的准入算法：把缓存流量划分为不相交类别，对每类评估缓存收益，将"给每类分配何种准入策略"建模为背包问题求最优解，目标是最小化 HDD 磁盘 IO 与 flash 损耗两大主导成本。生产结果：ATC 2022 会议版为相对 LARC **TCO 改善 6.5%、磁盘读减少 6%、flash 写入减少 26%**（一周平均）；TOS 2023 期刊版报告 **TCO 改善 7.7%、磁盘读降低 9.5%、flash 磨损降低 17.8%**。两版数字不同，引用时需注明版本。这是 2020 年后少有的透露 Colossus 生产细节的同行评审论文。
 
 ### 设计启示
 

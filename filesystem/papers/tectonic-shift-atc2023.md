@@ -737,7 +737,7 @@ mindmap
 | Quiver（FAST 2020） | 按样本的内容寻址缓存，利用深度学习对样本顺序不敏感来"替换"未命中的样本 | Quiver 能改变读取顺序，因为它和训练框架紧耦合；Shift 对应用透明，只能决定缓存什么 |
 | SHADE（FAST 2023） | 按样本重要性做缓存与采样 | 同样是"应用语义驱动缓存"，但 SHADE 要改训练流程 |
 | 3FS（DeepSeek） | 全 NVMe + RDMA，不靠缓存 | 直接选择"纯 flash"路线（即论文表 1 的方案 2）；适合数据集相对小、IO 极高的 LLM 训练，与 DLRM PB 级数据集的取舍不同 |
-| CacheSack（ATC 2022） | Colossus flash 缓存准入，按类别优化 | 最接近的工业对照；信号来自历史统计，Shift 额外引入未来信号 |
+| CacheSack（ATC 2022，[精读](cachesack-atc2022.md)） | Colossus flash 缓存准入，按类别优化 | 最接近的工业对照；信号来自历史统计，Shift 额外引入未来信号 |
 
 ---
 
