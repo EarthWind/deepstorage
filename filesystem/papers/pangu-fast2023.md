@@ -15,6 +15,7 @@
 > - [InfiniFS（FAST 2022）精读](infinifs-fast2022.md)：盘古元数据服务采用的并行路径解析等技术来源。
 > - [工业界生产系统中的盘古小节](industry-production-systems.md#3-alibaba-pangu-more-than-capacityfast-2023)。
 > - [Tectonic（FAST 2021）精读](tectonic-fast2021.md)：同为"重客户端"的超大规模生产文件系统。
+> - [EBS Glory（FAST 2024）精读](ebs-fast2024.md)：建在盘古之上的阿里云块存储三代演进，可与本文流量放大、FPGA 压缩部分对照。
 
 ## 目录
 
