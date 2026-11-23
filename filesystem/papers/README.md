@@ -38,6 +38,7 @@
 - [LineFS（SOSP 2021）](linefs-sosp2021.md)：KAIST、UT Austin、KTH 等把客户端本地 PM 分布式文件系统（基于 Assise）的后台任务卸载到第一代 BlueField SmartNIC。覆盖 Assise 与 Ceph 的客户端 CPU 账单、PCIe 与弱核两大卸载难点（直接卸载慢 30 倍以上）、LibFS / NICFS / 内核工作线程的分工、先持久后发布、共享前两级的发布与复制流水线、主动链式复制与低延迟/高吞吐连接分离、租约卸载与访问控制、主机崩溃时的独立 NICFS 模式、多租户干扰与 DMA 中断 vs 轮询的实验、压缩省带宽，以及引言与评估数字不一致、"好 X%"口径等问题。
 - [DPFS（SYSTOR 2023）](dpfs-systor2023.md)：IBM Research 与 VU Amsterdam 用现成 DPU（BlueField-2）+ 内核自带 virtio-fs 把云文件系统客户端整体卸载出租户主机。覆盖块层 vs 文件层卸载的 I/O 放大论证、DPFS-HAL / DPFS-FUSE / 可插拔后端三层框架、NFS（libnfs + XLIO）与 RAMCloud KV 后端、约 40 µs 框架开销与延迟分解、主机 CPU 4.4× 的微架构推导、单队列与队列深度等局限及后续内核多队列补丁，以及与 Fisc、LineFS 的对照。
 - [DAOS（SCFA 2020）](daos-scfa2020.md)：Intel 面向 Optane 持久内存 + NVMe 的全用户态开源分布式对象存储。覆盖传统并行文件系统的三层开销、PMDK/SPDK/libfabric 三块基石与介质分工、Argobots 每请求一个 ULT 的轮询式服务端（九步 I/O 流程）、128 位对象 ID 的算法放置、所有副本直接 RDMA 拉客户端数据的副本/EC 写与失败不等待的变种 2PC、去中心化重建、多版本消除读-改-写（含 EC 部分条带写）、端到端校验、libdfs/dfuse/拦截库的 POSIX 分层、IO500 SC19 图表读数（含论文未提的 easy 带宽落后），以及持久内存容量等数字矛盾。
+- [Fire-Flyer AI-HPC（SC 2024）](fireflyer-aihpc-sc2024.md)：DeepSeek 万卡 PCIe A100 集群整篇论文精读（3FS 细节见下一条）。覆盖算力需求与集群形态、PCIe + 单网卡节点与双区两层 Fat-Tree（含 122 台交换机推导）、成本与功耗账、HFReduce 的两个算法与 24 倍访存/chained write/共享 Root Port 瓶颈链、HaiScale 的 PP 错峰与 FSDP 及全部扩展性数据复算、存算一体网络防拥塞与关闭 DCQCN、HAI 分时调度与 5 分钟 checkpoint、验证器、一年 Xid/内存/IB 闪断原始数据复算、下一代 1:1 网卡多平面网络，以及 LLaMA 91% 效率、表 VII/VIII 闪断次数等不一致之处。
 - [3FS / Fire-Flyer（SC 2024 + 2025 开源设计说明）](3fs-fireflyer-sc2024.md)：DeepSeek 万卡 PCIe A100 集群与其文件系统。覆盖 PCIe + 单网卡 + 两层 Fat-Tree 双区的成本账、HFReduce/HaiScale、存算一体网络的防拥塞（SL/VL、静态路由、关闭 DCQCN、request-to-send）、无状态 meta + FoundationDB 键设计与文件长度维护、链表与 BIBD 恢复均衡布局、改造的 CRAQ、目标状态机与在线恢复、chunk 引擎、USRBIO、checkpoint 与 KVCache、一年硬件故障数据，以及性能数字口径核对。
 - [FalconFS（NSDI 2026）](falconfs-nsdi2026.md)：上交 IPADS 与华为面向深度学习流水线的分布式文件系统。覆盖自动驾驶 DL 负载刻画与"查找税"/瞬时倾斜两大挑战、无状态客户端架构、文件名哈希 + 选择性重定向的混合元数据索引（含 O(n log n) 例外表证明）、按需拉取 + 广播失效的惰性命名空间复制、锁与 WAL 的并发请求合并、基于 `LOOKUP_PARENT` 的 VFS shortcut，以及评估数字口径与表格笔误的说明。
 - [CFS（EuroSys 2023）](cfs-eurosys2023.md)：中科大与百度的全 POSIX 分布式文件系统元数据服务。覆盖锁开销实测、文件属性与命名空间层级的分层组织（TafDB 范围分区 + FileStore 哈希）、无 2PC 的跨层写入顺序与 GC、单分片原子原语与 delta apply / last-writer-wins 冲突合并、rename 快慢路径、去代理层，以及与 InfiniFS 的逐项对照。
@@ -56,6 +57,7 @@
 | SingularFS (ATC 2023) | 元数据扩展性 | 新硬件（PM + RDMA 视角） |
 | FalconFS (NSDI 2026) | 元数据扩展性 | 工业界生产系统、HPC/AI 存储（深度学习负载视角） |
 | 3FS / Fire-Flyer (SC 2024 + 2025 开源报告) | 工业界生产系统 | 新硬件（RDMA+NVMe 视角）、HPC/AI 存储（AI 负载视角） |
+| Fire-Flyer AI-HPC (SC 2024，整篇精读) | 工业界生产系统 | 精读文档 fireflyer-aihpc-sc2024.md（计算、网络、平台、故障视角） |
 | DPFS (SYSTOR 2023) | 客户端与通用技术 | 新硬件（DPU 视角） |
 | DAOS (SCFA 2020) | HPC/AI 存储 | 新硬件（SCM/后 PM 演进视角） |
 
