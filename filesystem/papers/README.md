@@ -34,6 +34,7 @@
 - [Tectonic-Shift（ATC 2023）](tectonic-shift-atc2023.md)：Meta 在 HDD Tectonic 前加透明 flash 读缓存 Shift 服务 ML 训练。覆盖功耗驱动的软硬件设计空间、DLRM 训练负载刻画、一致性哈希 + CacheLib 架构、基于作业规格的准入/重插入策略与 PID 写入限速、策略评估与生产 29% 功耗收益。
 - [InfiniFS（FAST 2022）](infinifs-fast2022.md)：清华等提出的数据中心级元数据服务。覆盖阿里云盘古负载刻画、访问-内容解耦分区、基于出生三元组哈希的推测式路径解析（含 rename-list/back-pointer）、乐观访问元数据缓存与惰性失效、孤儿环与事务、因素分析与千亿文件评估。
 - [SingularFS（ATC 2023）](singularfs-atc2023.md)：清华用单台元数据服务器（Optane PM + RDMA）支撑十亿级文件。覆盖单机路线的规模论证、基于 btime/dtime 时间戳不变式的无日志元数据操作、写者/更新者/读者三级并发控制（cmpxchg16b 无锁时间戳）、NUMA 间与 NUMA 内的混合 inode 分区、惰性崩溃恢复，以及与 InfiniFS、CFS 的对照。
+- [Colossus（2021 官方博客 + 2025 两篇续篇）](colossus-blog2021.md)：Google 集群级文件系统，GFS 的继任者（非论文）。覆盖从 GFS 单 master 到 Curator + BigTable 元数据的演进、Borg/Spanner/Colossus 三块基石与两层元数据的区分、客户端库/Curator/BigTable/D 服务器/Custodian 五个组件、元数据递归存储的自举问题、共享存储池与资源解耦、服务层级、flash 按 IO 与 HDD 按容量的配比、2025 年 L4 SSD 读缓存与写回放置、handle + quorum 追加的有状态协议与 Rapid Storage 的版本号隔离，以及 Tectonic 论文误称元数据存于 Spanner 等资料矛盾。
 - [盘古 2.0（FAST 2023）](pangu-fast2023.md)：阿里巴巴统一存储底座 Pangu 从"卖容量"到"卖性能"的演进。覆盖盘古 1.0 到 2.0 两阶段、重客户端 + Raft master（命名空间与 stream 分离）+ chunkserver 架构、统一只追加 FlatLogFile 与自包含 chunk 布局、元数据优化（并行解析、批量、预取、捎带省 RTT）、USSOS 用户态运行时与 USSFS、chasing/non-stop write/backup read/概率黑名单、泰山服务器、有损 RDMA、EC + LZ4 把流量放大从 6.375× 降到 2.94×、RDCA 让数据驻留 LLC、混合 RPC 与 mwait、FPGA 压缩与网卡 CRC、单节点有效吞吐 6.1× 的六阶段瓶颈转移、两次双十一事故与四条教训，以及 P999 前后不一致、mwait 单位存疑等问题。
 - [Fisc（FAST 2023）](fisc-fast2023.md)：阿里巴巴面向云原生容器的文件系统接入层（后端为盘古）。覆盖重客户端与集中网络网关的问题刻画、两层功能聚合的轻量客户端（DPU agent + 存储侧 proxy）、文件粒度路由与存储感知故障处理、就近读、virtio-Fisc 设备与 FPGA 快路径、DPU 资源优化、vRPC 与端到端 QoS，以及评估数字中的不一致之处。
 - [LineFS（SOSP 2021）](linefs-sosp2021.md)：KAIST、UT Austin、KTH 等把客户端本地 PM 分布式文件系统（基于 Assise）的后台任务卸载到第一代 BlueField SmartNIC。覆盖 Assise 与 Ceph 的客户端 CPU 账单、PCIe 与弱核两大卸载难点（直接卸载慢 30 倍以上）、LibFS / NICFS / 内核工作线程的分工、先持久后发布、共享前两级的发布与复制流水线、主动链式复制与低延迟/高吞吐连接分离、租约卸载与访问控制、主机崩溃时的独立 NICFS 模式、多租户干扰与 DMA 中断 vs 轮询的实验、压缩省带宽，以及引言与评估数字不一致、"好 X%"口径等问题。
@@ -54,6 +55,7 @@
 | Tectonic-Shift (ATC 2023) | 工业界生产系统 | HPC/AI 存储（训练 IO 视角，简述） |
 | InfiniFS (FAST 2022) | 元数据扩展性 | 工业界生产系统、客户端与通用技术（客户端元数据缓存视角） |
 | CFS (EuroSys 2023) | 元数据扩展性 | 工业界生产系统、客户端与通用技术（事务临界区视角） |
+| Colossus (2021 博客 + 2025 续篇) | 工业界生产系统 | 精读文档 colossus-blog2021.md |
 | Pangu 2.0 (FAST 2023) | 工业界生产系统 | 精读文档 pangu-fast2023.md；客户端与通用技术（EC/压缩视角） |
 | Fisc (FAST 2023) | 工业界生产系统 | 新硬件（DPU 卸载视角）、客户端与通用技术（轻量客户端视角） |
 | SingularFS (ATC 2023) | 元数据扩展性 | 新硬件（PM + RDMA 视角） |

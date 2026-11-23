@@ -733,7 +733,7 @@ flowchart LR
 | HDFS Federation / WAS | 多个单 NameNode namespace 共享存储节点 | 仍有数据集装箱问题；跨实例迁移需要重量级拷贝 | Tectonic 无装箱问题 |
 | Ceph / FDS | 对象 ID 哈希定位，无中心元数据 | 集群越大故障越频繁，哈希到位置的映射更新要传播到所有节点；扩容和下线时缺少可控迁移 | Tectonic **显式记录** chunk → 节点映射，可以控制迁移 |
 | ADLS / HopsFS | 元数据分层，存于分片存储 | 相关目录放在同一分片，存在子树热点；ADLS 的 block 存储用 WAS 联邦架构 | Tectonic 目录**哈希分片**，block 存储是**扁平**的 |
-| Colossus | 元数据存于 Spanner（全局一致数据库），客户端直连 | 集群级多 EB | Tectonic 底座只有分片内强一致，论文称"在实践中不是问题" |
+| Colossus | 元数据存于 Spanner（全局一致数据库），客户端直连（论文原文如此；Google 官方博客称 Colossus 文件系统元数据存在 BigTable，Spanner 存的是上层存储服务的元数据，见 [Colossus 精读 §11.1](colossus-blog2021.md#111-元数据存在-bigtable-还是-spanner)） | 集群级多 EB | Tectonic 底座只有分片内强一致，论文称"在实践中不是问题" |
 | Blob / 对象存储 | 没有层级目录树 | 更容易扩展 | 数仓负载需要层级 namespace |
 | Lustre / GPFS | 元数据节点数量有限 / 完整 POSIX | 为高吞吐并行访问调优 | Lustre 元数据扩展性受限；GPFS 的 POSIX 元数据开销在此场景下没必要 |
 

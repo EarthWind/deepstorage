@@ -301,7 +301,7 @@ Pangu 是阿里统一存储底座（支撑 EBS、OSS、NAS、PolarDB、MaxComput
 ### 9.1 Colossus（**非论文**，官方博客/演讲）
 
 - **性质标注**：Colossus（GFS 继任者）**至今没有正式学术论文**。公开权威资料为 Google Cloud 官方博客（2021 年《A peek behind Colossus, Google's file system》）及历次会议演讲（如 2010 Faculty Summit、2017 Google Cloud Next 等）。本节内容基于官方博客，非同行评审论文。
-- **链接**：<https://cloud.google.com/blog/products/storage-data-transfer/a-peek-behind-colossus-googles-file-system>
+- **链接**：<https://cloud.google.com/blog/products/storage-data-transfer/a-peek-behind-colossus-googles-file-system>；逐段精读（含 2025 年两篇续篇）：[colossus-blog2021.md](colossus-blog2021.md)
 
 #### 架构要点（据官方博客）
 
@@ -310,6 +310,8 @@ Pangu 是阿里统一存储底座（支撑 EBS、OSS、NAS、PolarDB、MaxComput
 - **元数据存储**：文件系统元数据存于 **BigTable**（而 BigTable 自身又跑在 Colossus 上，自举分层解决），相比 GFS 单 master 扩展性提升 **100x+**；
 - **数据路径**："D" file servers（网络盘服务器），客户端与 D server 直连传输数据，最小化网络跳数；
 - **规模**：单集群可扩展至 **exabyte 级**、数万台机器；支持 flash/HDD 混布与冷热分层，承载 YouTube、Gmail、Search 与 Google Cloud 各存储产品。
+- **2025 年续篇补充**（Google Cloud 博客）：Colossus 是 zonal 的、单数据中心内一个集群一个文件系统；语义为只追加；两个文件系统各超过 10 EB，最大的文件系统读 >50 TB/s、写 >25 TB/s，最忙集群 >6 亿 IOPS；L4 分布式 SSD 缓存（读缓存 + 写回放置，基于 CacheSack 方法）；客户端打开文件得到含磁盘地址的 handle 后直连磁盘，追加写并行写副本并用 quorum 避开慢盘，Rapid Storage 将此有状态协议开放给 GCS。
+- **注意**：Tectonic 论文（FAST 2021）相关工作称"Colossus uses Spanner to store filesystem metadata"，与官方博客（BigTable）不一致；博客中 Spanner 存的是上层存储服务的元数据。
 
 ### 9.2 CacheSack（ATC 2022，Colossus Flash Cache 相关论文）
 
