@@ -176,11 +176,11 @@ FUSE 是分布式文件系统挂载 POSIX 接口最常见的途径（CephFS、Gl
 
 - **作者/机构**：Weidong Zhang 等（阿里巴巴）
 - **会议年份**：USENIX FAST 2024（Best Paper）
-- **链接**：<https://www.usenix.org/conference/fast24/presentation/zhang-weidong>
+- **链接**：<https://www.usenix.org/conference/fast24/presentation/zhang-weidong>；逐节精读：[ebs-fast2024.md](ebs-fast2024.md)
 - **问题**：十年三代云块存储（EBS1→EBS2→EBS3）演进中，弹性、可用性、硬件卸载、网络放大等维度的真实经验与教训。
-- **核心设计/内容**：EBS2 引入日志结构 + 后台 EC/压缩换取空间效率；EBS3 聚焦降低网络流量放大；总结四类教训：延迟/吞吐/IOPS/容量的弹性、以缩小爆炸半径（个体/区域/全局故障）提升可用性、硬件卸载的动机与取舍、以及"看似可行实则不然"的方案复盘。
-- **关键结果**：生产级数据支撑的架构演进史；例如后台 EC + 压缩把空间开销从 3 副本的 3x 降至约 1.29x（数值待确认）。
-- **设计启示**：直接可抄的路线图：前台 3 副本吸收小写、后台转 EC 的混合冗余，是兼顾写延迟与存储成本的务实方案；"爆炸半径"思维应落进控制面的放置与配额设计（分区、cell 化、全局组件降级路径）。
+- **核心设计/内容**：EBS2 建在盘古之上，引入日志结构 + 32 GiB 分段，后台 GC 时转 EC(8,3) + LZ4 换取空间效率；EBS3 用 Fusion Write Engine 跨盘合并小写、FPGA 压缩，前台直接写 EC(4,2) 的 JournalFile，降低网络流量放大；总结四类教训：延迟/吞吐/IOPS/容量的弹性、以缩小爆炸半径（个体/区域/全局故障）提升可用性、硬件卸载的动机与取舍、以及"看似可行实则不然"的方案复盘。
+- **关键结果**：空间放大（副本/数据）EBS1 3 → EBS2 1.29 → EBS3 0.77；流量放大 3 → 4.69 → 1.59；EBS2/EBS3 单盘 1M IOPS、4,000 MiB/s、平均写延迟 100 µs；分线程后 EBS3 P99.999 写 1 ms、读 2.5 ms；BlockClient 卸载 FPGA → ASIC（FPGA 导致 37% 数据损坏事件、22% 停机），BlockServer 卸载 FPGA → ARM CPU。
+- **设计启示**：直接可抄的路线图：前台 3 副本吸收小写、后台转 EC 的混合冗余，是兼顾写延迟与存储成本的务实方案；"爆炸半径"思维应落进控制面的放置与配额设计（分区元数据表、单节点管理者、逻辑故障域限制自动迁移范围）。
 
 ### 4.3 A Study of Failure Recovery and Logging of High-Performance Parallel File Systems
 

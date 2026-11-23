@@ -336,7 +336,7 @@ CacheSack 是 **Colossus Flash Cache**（Colossus 的通用 flash 缓存服务�
 
 以下为 2020 年后与工业界 DFS 相关、但因主题（块存储/局部存储/GC）或时间关系不单独成节的论文：
 
-- **What's the Story in EBS Glory: Evolutions and Lessons in Building Cloud Block Store**（Alibaba，FAST 2024）：阿里云 EBS 十年演进，构建于 Pangu 之上，讨论联邦 Pangu 集群、EC/压缩降流量放大等，与 Pangu 论文互补。链接：<https://dl.acm.org/doi/10.5555/3650697.3650714>（USENIX FAST 2024）。
+- **What's the Story in EBS Glory: Evolutions and Lessons in Building Cloud Block Store**（Alibaba，FAST 2024）：阿里云 EBS 十年三代演进（EBS2 起构建于 Pangu 之上），讨论日志结构 + 分段、前台 EC/压缩降流量放大（4.69 → 1.59）、Federated BlockManager 与逻辑故障域、FPGA → ASIC/ARM 的卸载取舍等，与 Pangu 论文互补。逐节精读：[ebs-fast2024.md](ebs-fast2024.md)。链接：<https://dl.acm.org/doi/10.5555/3650697.3650714>（USENIX FAST 2024）。
 - **Discard-Based Garbage Collection for Distributed Log-Structured Storage Systems in ByteDance**（ByteDance，FAST 2026）：针对字节跳动基础存储层 ByteStore（分布式 append-only 存储）的 GC 方案 DisCoGC，TCO 降低约 20%。链接：<https://www.usenix.org/conference/fast26/presentation/bian>。说明字节的 DFS 底座（ByteStore）尚无整体架构论文，待确认后续是否发表。
 - **SingularFS: A Billion-Scale Distributed File System Using a Single Metadata Server**（清华，ATC 2023）：学术系统，用单元数据服务器支撑十亿级文件，可作为单机元数据服务性能上限的参考。
 - **腾讯**：未检索到 2020 年后来自腾讯大规模生产 DFS 的顶会论文（其开源 DFS 相关工作如 CubeFS 的论文《CFS: A Distributed File System for Large Scale Container Platforms》发表于 SIGMOD 2019，出自京东，且在 2020 年前）——**待确认**。
