@@ -10,7 +10,7 @@
 
 1. [Facebook's Tectonic Filesystem（FAST 2021）](#1-facebooks-tectonic-filesystem-fast-2021)
 2. [Tectonic-Shift（ATC 2023）](#2-tectonic-shift-atc-2023)
-3. [Alibaba Pangu: More Than Capacity（FAST 2023）](#3-alibaba-pangu-more-than-capacity-fast-2023)
+3. [Alibaba Pangu: More Than Capacity（FAST 2023）](#3-alibaba-pangu-more-than-capacityfast-2023)
 4. [Alibaba Fisc（FAST 2023）](#4-alibaba-fisc-fast-2023)
 5. [Baidu CFS（EuroSys 2023）](#5-baidu-cfs-eurosys-2023)
 6. [InfiniFS（FAST 2022，清华 + Alibaba）](#6-infinifs-fast-2022)
@@ -92,34 +92,40 @@ Meta 的 ML 训练（推荐模型为主）对训练数据存储提出了海量�
 ## 3. Alibaba Pangu: More Than Capacity（FAST 2023）
 
 - **论文标题**：More Than Capacity: Performance-oriented Evolution of Pangu in Alibaba
-- **作者/机构**：Qiang Li 等，Alibaba Group / Alibaba Cloud（作者列表庞大，含厦门大学 Qiao Xiang 等学术合作者）
+- **作者/机构**：Qiang Li 等 29 位作者，阿里巴巴集团与厦门大学（Qiao Xiang、Jiwu Shu 等）
 - **会议与年份**：USENIX FAST 2023（Deployed Systems 类）
-- **论文链接**：<https://www.usenix.org/conference/fast23/presentation/li-qiang-deployed>（PDF: <https://www.usenix.org/system/files/fast23-li-qiang_more.pdf>）
+- **论文链接**：<https://www.usenix.org/conference/fast23/presentation/li-qiang-deployed>（PDF: <https://www.usenix.org/system/files/fast23-li-qiang_more.pdf>）；逐节精读：[pangu-fast2023.md](pangu-fast2023.md)
 
 ### 解决的问题
 
-Pangu 是阿里统一存储底座（支撑 EBS、OSS、NAS、数据库、MaxCompute 等）。论文讲述 Pangu 从"容量导向"（HDD 时代）到"性能导向"（SSD + RDMA 时代）的两阶段演进，目标是提供 **100 µs 级 I/O 延迟** 与毫秒级 P999 SLA 的高性能存储服务。
+Pangu 是阿里统一存储底座（支撑 EBS、OSS、NAS、PolarDB、MaxCompute 等，EB 级容量、万亿级文件）。论文讲述盘古 2.0 的两个阶段：阶段一（2015 起）拥抱 SSD + RDMA，目标是 **100 µs 级平均 I/O 延迟**与毫秒级 P999；阶段二（2018 起）业务从"卖容量"转向"卖性能"，网络从 2×25 Gbps 升级到 2×100 Gbps 后依次突破网络、内存、CPU 瓶颈。
 
 ### 核心架构设计
 
-- **总体架构**：Client（胖客户端）+ PanguMasters（元数据/chunkserver 状态管理）+ ChunkServer（数据）。客户端负责与 chunkserver 的数据操作及与 master 的元数据交互，本地维护 LRU 元数据缓存减少 master 查询。
-- **第一阶段（拥抱 SSD + RDMA）**：
-  - 重构文件系统为**统一 append-only 持久层**（unified, append-only persistence layer），所有上层抽象（块、对象、文件）落到 append-only chunk 写入，天然利于 SSD 与 EC；
-  - 自研**用户态存储操作系统 USSFS**（user-space storage file system）：绕过内核，run-to-completion 线程模型，用户态驱动直接操作 NVMe SSD，为不同硬件（含 SMR）提供 append 写引擎；
-  - 网络侧大规模部署 RDMA（存算之间），配合自研 RPC 减少延迟抖动。
-- **第二阶段（网络带宽从 25G → 100G/200G 的基础设施升级）**：围绕"性能/成本"持续优化——流量放大优化（EC/压缩：在线 EC + FPGA 压缩降低网络放大）、独立网络端口隔离前后台流量、动态流控等。
-- **一致性与容错**：chunk 多副本/EC，master 管理 chunkserver 状态；通过快速故障检测与切换（配合客户端重试/backup read）实现毫秒级 P999。（论文级细节如 master 一致性协议，待确认。）
+- **总体架构**：重客户端（负责副本/EC 协议、重试、SLA）+ Masters（基于 Raft；拆分为命名空间服务与 stream 元数据服务，先按目录树、再按哈希分区）+ Chunkserver（运行用户态存储文件系统 USSFS）；GCWorker 负责垃圾回收与副本转 EC。
+- **阶段一（拥抱 SSD + RDMA）**：
+  - 统一只追加持久层 **FlatLogFile**，取代早期 LogFile、TempFile 等多种文件类型；上层服务用类 KV 映射 + GC 实现更新；
+  - **自包含 chunk 布局**：每个 sector unit 带 footer（chunk ID、长度、CRC），数据和元数据一次写完；变长 chunk 1 MB–2 GB；
+  - 元数据优化：并行路径解析（可预测目录 ID）、客户端 LRU 缓存、批量请求、投机预取、创建 chunk 与写数据合并省一个 RTT；
+  - chunkserver 的用户态存储**操作系统 USSOS**（run-to-completion、网络与存储共享大页零拷贝、超时任务后移、优先级队列、轮询/事件驱动切换），其上是只追加的 **USSFS**（无 page cache、无 journal、1 MB 分配粒度）；
+  - SLA 机制：chasing（3 副本写成 2 个即返回，第三个由客户端追写或 seal 后由 master 补齐）、non-stop write、backup read、确定性/非确定性两类黑名单（TCP 与 RDMA 分开维护）。
+- **阶段二（性能导向）**：
+  - 自研泰山存储服务器（2×24 核 Skylake、12×8 TB SSD、128 GB 内存、2 块双口 100 Gbps 网卡）；
+  - 网络：从无损 RDMA 改为**有损 RDMA**（关闭 PFC pause 帧）；前台写由 3 副本改为 EC(4,2)，客户端与 GCWorker 用 LZ4 压缩，写的流量放大从 6.375× 降到 2.9375×；前后台带宽阈值按时段动态调整；
+  - 内存：插更多小容量内存条占满通道；后台流量从 TCP 改走 RDMA（内存带宽省约 75%）；**RDCA** 让 RDMA 数据驻留在 LLC（约 12 MB），内存带宽省约 89%；
+  - CPU：数据路径用类 FlatBuffer 原始结构替代 Protobuf（每核吞吐 +59%）；超线程下用 monitor/mwait 让轮询线程睡眠（吞吐 +31.6%）；FPGA 计算型存储盘做压缩、RDMA 网卡算 CRC。
 
 ### 关键实验结果 / 生产规模
 
-- 生产环境达到 **100 µs 级平均 I/O 延迟**、毫秒级 P999，支撑阿里云 EBS/OSS 等核心业务；
-- 双十一等大促场景下的大规模验证；具体集群规模数字论文中有披露（如单集群万级节点，待确认精确值）。
+- 2018 双十一数据库访问（峰值 55 万 TPS）延迟 <280 µs；OTS 相同硬件下延迟降近一个数量级；EBS 写 P999 <1 ms；在线搜索读 P999 <5 ms（引言另写 <11 ms，前后不一致）；
+- 单存储节点归一化有效吞吐经六个阶段提升到 **6.1 倍**（1 → 1.7 → 2.0 → 3.3 → 5.0 → 6.1）；
+- 论文未给出单集群节点数；运维案例中提到一个 2,300 台服务器的集群。
 
 ### 设计启示
 
-- **统一 append-only 持久层**是同时支撑多种上层语义（块/对象/文件）并简化 EC、SSD GC 友好性的经过验证的设计；存储节点的存储引擎可采用 append-only chunk + 后台整理的模型；
-- 若追求极致延迟，存储节点端 run-to-completion + 用户态 IO（io_uring/SPDK）与 RDMA/自研 RPC 是工业界共识路径；
-- 前后台流量隔离（用户 IO vs 迁移/修复流量）应在存储节点与控制面的调度中显式设计。
+- **统一只追加持久层**是同时支撑块、对象、文件语义并简化 EC 与 SSD 友好写的经过验证的设计，代价是上层 GC 带来的后台流量；
+- 硬件升级后瓶颈会依次转移到网络、内存、CPU，需要逐项计算（流量放大、每字节网络数据的内存访问量）并针对性优化；
+- 前后台流量要显式隔离与限速（主机端限速、按时段调整后台带宽阈值）；恢复机制本身也要能扛住大规模异常（2020 双十一案例）。
 
 ---
 
@@ -355,7 +361,7 @@ CacheSack 是 **Colossus Flash Cache**（Colossus 的通用 flash 缓存服务�
 |---|---|---|---|
 | Facebook's Tectonic Filesystem: Efficiency from Exascale | Meta (Facebook) | FAST 2021 | 单一多租户 exabyte 级 DFS 整合 Blob 与数仓专用系统，三层 KV 化元数据 + 客户端定制化达到专用系统性能 |
 | Tectonic-Shift: A Composite Storage Fabric for Large-Scale ML Training | Meta + Stanford | ATC 2023 | 在 HDD Tectonic 上叠加应用感知 flash 缓存层 Shift，IO 吸收提升 1.51–3.28x，功耗降 29% |
-| More Than Capacity: Performance-oriented Evolution of Pangu in Alibaba | Alibaba | FAST 2023 | 统一 append-only 持久层 + 用户态存储 OS（USSFS）+ RDMA，实现 100 µs 级延迟的性能导向演进 |
+| More Than Capacity: Performance-oriented Evolution of Pangu in Alibaba | Alibaba | FAST 2023 | 统一 append-only 持久层 + 用户态存储 OS（USSOS）与只追加 USSFS+ RDMA，实现 100 µs 级延迟的性能导向演进 |
 | Fisc: A Large-scale Cloud-native-oriented File System | Alibaba | FAST 2023 | 云原生瘦客户端：vRPC + DPU 卸载 + 存储感知网关，客户端 CPU 降 69%，服务 300 万+ 核 |
 | CFS: Scaling Metadata Service via Pruned Scope of Critical Sections | Baidu | EuroSys 2023 | 精简临界区 + 分层元数据组织，POSIX 语义下元数据吞吐大幅超越 HopsFS/InfiniFS，生产运行 3 年 |
 | InfiniFS: An Efficient Metadata Service for Large-Scale Distributed Filesystems | 清华 + Alibaba | FAST 2022 | 目录访问/内容元数据解耦 + 推测路径解析 + 乐观客户端缓存，支撑千亿文件元数据服务 |

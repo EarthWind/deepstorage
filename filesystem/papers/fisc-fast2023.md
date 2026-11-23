@@ -8,7 +8,7 @@
 >
 > 精读日期：2026-11-22。文中**数字、表格与机制描述均摘自论文原文**（标注所在章节）；标注"解读"的段落是本文作者的分析与推论，不是论文原话。
 >
-> 相关文档：[工业界生产系统中的 Fisc 小节](industry-production-systems.md#4-alibaba-fiscfast-2023)、[新硬件综述中的 Fisc 小节](new-hardware.md#6-fisc-a-large-scale-cloud-native-oriented-file-system)、[客户端与通用技术中的 Fisc 小节](client-and-general-techniques.md#14-fisc-a-large-scale-cloud-native-oriented-file-system)、[Tectonic（FAST 2021）精读](tectonic-fast2021.md)（论文批评的"重客户端"代表之一）。
+> 相关文档：[工业界生产系统中的 Fisc 小节](industry-production-systems.md#4-alibaba-fiscfast-2023)、[新硬件综述中的 Fisc 小节](new-hardware.md#6-fisc-a-large-scale-cloud-native-oriented-file-system)、[客户端与通用技术中的 Fisc 小节](client-and-general-techniques.md#14-fisc-a-large-scale-cloud-native-oriented-file-system)、[Tectonic（FAST 2021）精读](tectonic-fast2021.md)（论文批评的"重客户端"代表之一）、[盘古 2.0（FAST 2023）精读](pangu-fast2023.md)（Fisc 的后端，同样是重客户端）。
 
 ## 目录
 
