@@ -105,23 +105,24 @@
 
 - **会议**：SOSP 2021，**Best Paper Award**
 - **作者/机构**：Jongyul Kim（KAIST）、Insu Jang（Univ. of Michigan）、Waleed Reda（KTH / UCLouvain）、Jaeseong Im（KAIST）、Marco Canini（KAUST）、Dejan Kostić（KTH）、Youngjin Kwon（KAIST）、Simon Peter（UT Austin）、Emmett Witchel（UT Austin / Katana Graph）
-- **链接**：https://www.cs.utexas.edu/~witchel/pubs/kim21sosp-linefs.pdf ；代码开源（linefs）
-- **目标硬件**：NVIDIA/Mellanox BlueField SmartNIC（ARM 多核）+ 客户端本地 PM（基于 Assise 改造）
+- **链接**：https://www.cs.utexas.edu/~witchel/pubs/kim21sosp-linefs.pdf ；代码：https://github.com/casys-kaist/LineFS
+- **精读**：[linefs-sosp2021.md](linefs-sosp2021.md)
+- **目标硬件**：第一代 Mellanox BlueField SmartNIC（MBF1M332A，16 核 ARM A72 @ 800 MHz，2×25GbE）+ 客户端本地 Optane PM（基于 Assise 改造）
 
 ### 核心设计
 
-- 动机：Assise 类 client-local PM DFS 的复制、压缩、日志 digest 等后台任务消耗主机 CPU 并与应用争抢，造成性能干扰。
-- **offload 划分**：把 DFS 分解为"host 侧极薄的 POSIX 接口 + 持久日志写入"与"NIC 侧全部 CPU 密集任务"（复制、压缩、数据 publication、索引构建、一致性管理）。主机故障时 NIC 上的 DFS 仍可继续提供部分服务（提升可用性）。
-- **流水线并行**是核心技术：SmartNIC 的 wimpy ARM 核单核性能弱，直接搬运任务会变慢。LineFS 把 DFS 操作切成多个 stage（如取日志 → 压缩 → 复制 → 确认），组成跨核流水线并行执行，用吞吐掩盖单核延迟；host↔NIC 之间通过 DMA + 轮询通道通信。
+- 动机：Assise 类 client-local PM DFS 的日志发布与建索引、复制、远程请求、一致性协调等后台任务消耗主机 CPU 并与应用争抢（100GbE、8 进程时 Assise 占 5.09 核，Ceph 占 2.11 核），造成性能干扰。
+- **offload 划分（先持久后发布）**：主机侧 LibFS 拦截 POSIX 调用，把数据和元数据写进私有 PM 日志即完成持久化，读路径也全在主机；SmartNIC 上的 NICFS 在后台做校验、发布调度、链式复制、租约仲裁和可选压缩。发布的实际拷贝由主机内核工作线程用 I/OAT DMA 完成。主机 OS 崩溃时，作为**副本**的节点可由 NICFS 经 PCIe 继续发布和复制（崩溃主机不能继续当 primary）。
+- **流水线并行**是核心技术：直接卸载 Assise 的 SharedFS 吞吐下降超过 30 倍。LineFS 以 4 MB chunk 为单位，发布流水线为取回 → 校验 → 发布 → 确认，复制流水线为取回 → 校验 →（可选压缩）→ 传输 → 确认，两者共享前两级；按日志顺序提交，保证线性一致与前缀崩溃一致。NICFS 用单边 RDMA 经 PCIe 读主机 PM 日志；内核工作线程等 DMA 完成用中断而非轮询（轮询对共存应用干扰更大）。
 - 主机与 NIC 分工遵循"数据路径延迟敏感部分留在主机 PM，吞吐型后台移到 NIC"。
 
 ### 关键实验结果
 
-- 对比 Assise：LevelDB 延迟最多降 80%，Filebench 吞吐最多升 79%；在主机高负载（CPU 争抢）时优势更明显；主机故障期间 NIC 侧可维持 DFS 可用性。
+- 对比 Assise（3 节点，副本主机被 CPU 密集作业占满时）：写吞吐高 33%，`fsync` 写 99.9 分位延迟低 41 倍，Fileserver 吞吐高 79%；LevelDB 顺序插入"延迟好 80%"（论文口径是 Assise 为 LineFS 的 1.8 倍，即延迟约降 45%）。副本空闲时吞吐只比后台复制版 Assise 高 4%，同步写平均延迟 149 µs，约为 Assise 76 µs 的 2 倍；Varmail 慢 21%。压缩可省 72% 复制带宽。
 
 ### 局限
 
-- 依赖 PM（停产）与特定代 BlueField（BlueField-1/2，ARM 核数与 DMA 带宽制约划分策略）；流水线划分是手工设计，通用性/可移植性有限；host-NIC 通信通道本身有开销。
+- 依赖 PM（停产）与客户端本地模型；只在第一代 BlueField、25GbE、3 节点上验证；发布仍需主机内核线程，残余干扰约 23%；SmartNIC 本身是单点（NICFS 故障时本机文件系统不可用，故障切换未实现）；流水线划分是手工设计，chunk 大小等参数无敏感性分析；引言与评估部分数字不一致（详见精读）。
 
 ### 设计启示
 
