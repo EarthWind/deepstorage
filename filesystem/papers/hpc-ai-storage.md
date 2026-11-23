@@ -61,17 +61,18 @@ AI 训练的 I/O 模式与传统 HPC 明显不同：
 
 ### 2.2 DAOS: A Scale-Out High Performance Storage Stack for Storage Class Memory
 
-- **作者/机构**：Zhen Liang、Johann Lombardi、Mohamad Chaarawi、Michael Hennecke（Intel）
+- **作者/机构**：Zhen Liang、Johann Lombardi、Mohamad Chaarawi（Intel），Michael Hennecke（Lenovo）
 - **会议年份**：Supercomputing Frontiers Asia（SCFA）2020，Springer LNCS 12082
 - **链接**：<https://doi.org/10.1007/978-3-030-48842-0_3>
-- **目标负载**：HPC 与数据密集型负载的高 IOPS + 高带宽存储；为 Aurora 等 E 级系统设计的下一代存储栈。
+- **精读**：[daos-scfa2020.md](daos-scfa2020.md)（逐节解读、IO500 图表读数与整体总结）
+- **目标负载**：HPC 与数据密集型负载的高 IOPS + 高带宽存储，重点是小、不对齐、元数据密集的 I/O。
 - **核心设计**：
-  - **全用户态、绕内核**：数据路径完全在用户态，SCM（Optane PMem，经 PMDK）存元数据与小 I/O，NVMe SSD（经 SPDK）存大块数据；无内核文件系统、无本地文件系统开销。
-  - **事务化、多版本对象模型**：对象为 key-array 结构（dkey/akey/数组），支持 epoch 版本与分布式事务；元数据路径与数据路径分离。
-  - **算法化放置**：对象按算法（无中心查表）分布到 storage target，副本/纠删码内建；端到端 checksum。
-  - **丰富接入层**：原生对象 API 之上提供 POSIX（libdfs/dfuse）、MPI-IO、HDF5 等中间件适配。
-- **关键结果**：论文给出 IO500 基准的初始性能；此后 DAOS 长期位居 IO500 榜单前列（如 SC21 期间 QCT 系统进入总榜第 16、10 节点挑战第 12），并成为 Argonne Aurora（EiB 级、待确认具体容量）的主存储，在 MLPerf Storage 中亦有领先表现。
-- **局限**：深度绑定 Optane PMem（Intel 已停产 Optane，后续版本转向 "Metadata-on-NVMe" 架构，见 DAOS "Beyond Persistent Memory" 后续论文）；运维复杂度高；强依赖 RDMA 网络。
+  - **全用户态、绕内核**：PM（Optane，经 PMDK load/store）存全部内部元数据、key 索引与延迟敏感的小 I/O，NVMe SSD（经 SPDK）存大 I/O，SSD 数据写完后在 PM 中建索引；网络经 Mercury/libfabric 轮询；服务端每个请求一个 Argobots 用户级线程。
+  - **多版本对象模型**：pool → container → object，对象分 KV（含多级 KV）与数组两类，数据带版本，支持事务与快照；多版本使小写/不对齐写和 EC 部分条带写都无需读-改-写。（dkey/akey、epoch 等术语来自 DAOS 设计文档，论文未出现。）
+  - **算法化放置**：对象只由 128 位 ID 标识，ID 中编码副本/EC 策略，其余位作伪随机种子算出布局，不存布局元数据；副本与 EC 写都由所有参与者直接 RDMA 拉客户端缓冲区；变种 2PC 遇故障换替补不等待；SWIM 检测故障，Raft 复制的 pool service 触发去中心化重建；端到端 checksum。
+  - **丰富接入层**：原生对象 API 之上提供 POSIX（libdfs + dfuse + read/write 拦截库）、MPI-IO、HDF5 等中间件。
+- **关键结果**：IO500 SC19（DAOS 0.6，8 台 Optane 存储节点）：10 节点挑战榜总排名第 1、带宽分第 1，元数据分约为第二名 3 倍，hard 与 easy 负载表现接近；全榜第 2，仅用 26 个客户端节点。注意 easy 带宽 Lustre/SuperPOD 明显更高，DAOS 的带宽分第一靠的是 hard 负载。论文之外的后续事实：DAOS 此后长期位居 IO500 前列，并成为 Argonne Aurora 的存储系统（具体容量本文未核实）。
+- **局限**：深度绑定 Optane PMem（Intel 已停产 Optane，后续版本转向 Metadata-on-SSD 架构，见 DAOS "Beyond Persistent Memory" 后续论文）；论文无延迟、故障与重建实验；运维复杂度高；高性能依赖 RDMA（论文称传输层也可用标准 TCP）。
 - **设计启示**：
   - 用户态数据路径 + SPDK 是存储节点追求 TB/s 级聚合带宽的可行路线；小 I/O 与元数据放低延迟介质、大 I/O 直下 NVMe 的分流思想与"小文件打包进大块存储单元"互补。
   - DAOS 的教训：不要把持久化格式绑死在特定硬件（PMem）；对介质假设弱的 append-only 布局是更稳健的选择。
