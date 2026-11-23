@@ -38,6 +38,7 @@
 - [CacheSack（ATC 2022）](cachesack-atc2022.md)：Google Colossus Flash Cache 的准入算法（Colossus L4 缓存的方法基础）。覆盖磁盘 IO 成本与 flash 写放大/寿命约束、索引与数据分离的缓存架构、FIFO + 28% 二次机会淘汰、LARC 的三个问题与"命中率不等于省磁盘读"（下层 buffer cache）、按表/locality group 分类与四种准入策略、TTL 近似 LRU 的逐块可加估算（附手算示例）、分数背包 + 下凸包贪心与 127 个候选保留时间、5000 桶/ghost cache/382 个模拟器等工程参数、可内省可维护的落地经验、生产 A/B（磁盘读 −6%、写入 −26%、TCO −6.5%）与仿真中的 U 形总成本曲线，以及会议版与期刊版数字差异等问题。
 - [盘古 2.0（FAST 2023）](pangu-fast2023.md)：阿里巴巴统一存储底座 Pangu 从"卖容量"到"卖性能"的演进。覆盖盘古 1.0 到 2.0 两阶段、重客户端 + Raft master（命名空间与 stream 分离）+ chunkserver 架构、统一只追加 FlatLogFile 与自包含 chunk 布局、元数据优化（并行解析、批量、预取、捎带省 RTT）、USSOS 用户态运行时与 USSFS、chasing/non-stop write/backup read/概率黑名单、泰山服务器、有损 RDMA、EC + LZ4 把流量放大从 6.375× 降到 2.94×、RDCA 让数据驻留 LLC、混合 RPC 与 mwait、FPGA 压缩与网卡 CRC、单节点有效吞吐 6.1× 的六阶段瓶颈转移、两次双十一事故与四条教训，以及 P999 前后不一致、mwait 单位存疑等问题。
 - [EBS Glory（FAST 2024）](ebs-fast2024.md)：阿里云弹性块存储十年三代演进与经验。覆盖 EBS1 原地更新 Ext4 chunk 的局限、EBS2 建在盘古上的日志结构（LSBD、TxnFile、LSM 索引）与 128 GiB/32 GiB/数据扇区三级分段、后台 GC 转 EC(8,3)+LZ4、EBS3 的 Fusion Write Engine 跨盘合并与 FPGA 压缩及 JournalFile/SegmentCache/DataFile 两级日志、空间放大 3→1.29→0.77 与流量放大 3→4.69→1.59、EBSX 与"尾延迟看软件"、BlockClient 与三级并行的吞吐弹性和 Base+Burst、三级爆炸半径与 Federated BlockManager、令牌桶逻辑故障域、FPGA→ASIC/ARM 的卸载取舍、三个 What If，以及 FPGA 延迟、"提升 X%"口径等不一致之处。
+- [DisCoGC（FAST 2026）](discogc-fast2026.md)：字节跳动 ByteDrive + ByteStore 的 discard 与 compaction 结合 GC。覆盖 compaction-only 的写放大/空间放大两难、ByteDrive 两层（Volume/Segment，LSM 索引、块级压缩）与 ByteStore（LogFile、chunk、自包含扇区的用户态文件系统 UFS）结构、三类生产 trace（表 1 重排核对）与连续写/覆盖分析、discard 五步流程、EC 损失与 cluster 损失（可超过 50%）及边界扩展与 cluster 对齐 EC 条带、批处理/并行度/流控、修正垃圾率与双模式 compaction、两阶段 trim 与 trim 过滤/合并、Mock discard 灰度与 WAL 崩溃一致性、位图压缩、生产与测试床评估（TCO −20%）、调参与监控处置规则，以及章节间口径不一致之处。
 - [Fisc（FAST 2023）](fisc-fast2023.md)：阿里巴巴面向云原生容器的文件系统接入层（后端为盘古）。覆盖重客户端与集中网络网关的问题刻画、两层功能聚合的轻量客户端（DPU agent + 存储侧 proxy）、文件粒度路由与存储感知故障处理、就近读、virtio-Fisc 设备与 FPGA 快路径、DPU 资源优化、vRPC 与端到端 QoS，以及评估数字中的不一致之处。
 - [LineFS（SOSP 2021）](linefs-sosp2021.md)：KAIST、UT Austin、KTH 等把客户端本地 PM 分布式文件系统（基于 Assise）的后台任务卸载到第一代 BlueField SmartNIC。覆盖 Assise 与 Ceph 的客户端 CPU 账单、PCIe 与弱核两大卸载难点（直接卸载慢 30 倍以上）、LibFS / NICFS / 内核工作线程的分工、先持久后发布、共享前两级的发布与复制流水线、主动链式复制与低延迟/高吞吐连接分离、租约卸载与访问控制、主机崩溃时的独立 NICFS 模式、多租户干扰与 DMA 中断 vs 轮询的实验、压缩省带宽，以及引言与评估数字不一致、"好 X%"口径等问题。
 - [DPFS（SYSTOR 2023）](dpfs-systor2023.md)：IBM Research 与 VU Amsterdam 用现成 DPU（BlueField-2）+ 内核自带 virtio-fs 把云文件系统客户端整体卸载出租户主机。覆盖块层 vs 文件层卸载的 I/O 放大论证、DPFS-HAL / DPFS-FUSE / 可插拔后端三层框架、NFS（libnfs + XLIO）与 RAMCloud KV 后端、约 40 µs 框架开销与延迟分解、主机 CPU 4.4× 的微架构推导、单队列与队列深度等局限及后续内核多队列补丁，以及与 Fisc、LineFS 的对照。
@@ -60,6 +61,7 @@
 | Colossus (2021 博客 + 2025 续篇) | 工业界生产系统 | 精读文档 colossus-blog2021.md |
 | CacheSack (ATC 2022) | 工业界生产系统 | 精读文档 cachesack-atc2022.md；Colossus 精读（L4 缓存） |
 | EBS Glory (FAST 2024) | 客户端与通用技术 | 精读文档 ebs-fast2024.md；工业界生产系统（简述） |
+| DisCoGC (FAST 2026) | 工业界生产系统 | 精读文档 discogc-fast2026.md；与 EBS Glory 精读对照 |
 | Pangu 2.0 (FAST 2023) | 工业界生产系统 | 精读文档 pangu-fast2023.md；客户端与通用技术（EC/压缩视角） |
 | Fisc (FAST 2023) | 工业界生产系统 | 新硬件（DPU 卸载视角）、客户端与通用技术（轻量客户端视角） |
 | SingularFS (ATC 2023) | 元数据扩展性 | 新硬件（PM + RDMA 视角） |
