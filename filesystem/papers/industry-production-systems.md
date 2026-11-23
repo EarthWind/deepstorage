@@ -231,7 +231,7 @@ Pangu 是阿里统一存储底座（支撑 EBS、OSS、NAS、数据库、MaxComp
 
 #### 与存储相关的内容
 
-论文 §VI-B 用约一栏描述 3FS：180 台存储节点（每台 16 块 NVMe、2 × 200 Gbps IB，理论出口 9 TB/s、称实测读 8 TB/s）、四组件架构、inode 表 + 目录项表的 KV 元数据、CRAQ 链复制，以及为抑制客户端 incast 设计的 request-to-send 流控；§VI-A 讲存储流量与训练通信在同一网络中的 SL/VL 隔离，§VII-A 讲基于 3FS 批量写的 checkpoint（>10 GiB/s/节点）。更多细节见开源设计说明。逐节精读（论文 + 设计说明）：[3fs-fireflyer-sc2024.md](3fs-fireflyer-sc2024.md)
+论文 §VI-B 用约一栏描述 3FS：180 台存储节点（每台 16 块 NVMe、2 × 200 Gbps IB，理论出口 9 TB/s、称实测读 8 TB/s）、四组件架构、inode 表 + 目录项表的 KV 元数据、CRAQ 链复制，以及为抑制客户端 incast 设计的 request-to-send 流控；§VI-A 讲存储流量与训练通信在同一网络中的 SL/VL 隔离，§VII-A 讲基于 3FS 批量写的 checkpoint（>10 GiB/s/节点）。更多细节见开源设计说明。逐节精读（论文 + 设计说明）：[3fs-fireflyer-sc2024.md](3fs-fireflyer-sc2024.md)；整篇论文精读（计算、网络、平台、故障数据）：[fireflyer-aihpc-sc2024.md](fireflyer-aihpc-sc2024.md)
 
 ### 7.2 3FS（Fire-Flyer File System，开源项目，2025-02）
 

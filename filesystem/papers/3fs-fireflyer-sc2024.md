@@ -6,7 +6,7 @@
 >
 > 精读日期：2026-11-22。文中**数字、表格与机制描述均摘自上述两份资料**，分别以"论文 §x"和"设计说明"标注出处；标注"解读"的段落是本文作者的分析与推论，不是原文。
 >
-> 相关文档：本仓库基于源码的 3FS 系统调研 [project/3fs](../project/3fs/README.md)（元数据、数据路径、一致性、高可用、运维、性能八篇，源码基线 2026-05）；[工业界生产系统中的 3FS 小节](industry-production-systems.md#7-deepseek-fire-flyer-ai-hpc-与-3fs)、[新硬件综述中的 3FS 小节](new-hardware.md#10-3fsfire-flyer-file-systemai-时代的-rdma--nvme-分布式文件系统)、[HPC 与 AI 训练存储中的 3FS 小节](hpc-ai-storage.md#31-3fsfire-flyer-file-system-deepseek)、[FalconFS（NSDI 2026）精读](falconfs-nsdi2026.md)（另一条 AI 存储路线）。
+> 相关文档：本仓库基于源码的 3FS 系统调研 [project/3fs](../project/3fs/README.md)（元数据、数据路径、一致性、高可用、运维、性能八篇，源码基线 2026-05）；[工业界生产系统中的 3FS 小节](industry-production-systems.md#7-deepseek-fire-flyer-ai-hpc-与-3fs)、[新硬件综述中的 3FS 小节](new-hardware.md#10-3fsfire-flyer-file-systemai-时代的-rdma--nvme-分布式文件系统)、[HPC 与 AI 训练存储中的 3FS 小节](hpc-ai-storage.md#31-3fsfire-flyer-file-system-deepseek)、[FalconFS（NSDI 2026）精读](falconfs-nsdi2026.md)（另一条 AI 存储路线）；[Fire-Flyer AI-HPC 整篇精读](fireflyer-aihpc-sc2024.md)（计算、网络、平台与故障数据的细节）。
 
 ## 目录
 
@@ -200,7 +200,7 @@ flowchart LR
 | 场景 | 结果 |
 |------|------|
 | VGG16，HaiScale DDP（HFReduce）vs PyTorch DDP（NCCL） | 训练时间约为一半，32→512 GPU 并行效率约 88% |
-| LLaMA-13B，64→512 GPU（PP=4） | 每步 64.118 s → 9.717 s，并行效率 91% |
+| LLaMA-13B，64→512 GPU（PP=4） | 每步 64.118 s → 9.717 s，论文称并行效率 91%（按图中数据复算约 82.5%，91% 对应 256 卡，见 [整篇精读 §5.2](fireflyer-aihpc-sc2024.md#52-llm-训练优化论文-v-b)） |
 | DeepSeekMoE-16B，40→640 GPU（PP=10） | 每步 79.615 s → 6.535 s，并行效率 76.14%；320 GPU 时 92.92% |
 | GPT2-medium，HaiScale FSDP vs PyTorch FSDP | 16→128 GPU 并行效率 95%，训练时间约减半 |
 
@@ -790,7 +790,7 @@ README 把 dataloader 列为目标负载之一：通过支持跨计算节点**�
 
 ### 15.3 内存与网络故障（论文表 VII、图 10、图 11）
 
-2023-10 至 2024-03 六个月间：CPU 内存 ECC 错误 54 次，**网络闪断 89 次**，GPU 显存相关 Xid（63/64/79/94/95）149 次，合计 292 次。除 Xid 74 外的硬件故障中，IB 链路故障约占 30%。附录表 VIII 列出了一年间 IB 闪断的逐日记录，在整个运行期内随机出现。
+2023-10 至 2024-03 六个月间：CPU 内存 ECC 错误 54 次，**网络闪断 89 次**，GPU 显存相关 Xid（63/64/79/94/95）149 次，合计 292 次。除 Xid 74 外的硬件故障中，IB 链路故障约占 30%。附录表 VIII 列出了一年间 IB 闪断的逐日记录，在整个运行期内随机出现。注意 2023-10 的网络闪断在表 VII 中是 29 次，而表 VIII 当月逐日合计只有 13 次，见 [Fire-Flyer 整篇精读 §9.3](fireflyer-aihpc-sc2024.md#93-ib-网络闪断论文图-11表-viii)。
 
 **解读**：对存储系统而言，这组数据有两点启示。第一，**网络闪断是常态**（六个月 89 次），存储客户端和链复制必须能容忍短暂的链路中断而不触发大规模恢复——这也是 3FS 心跳租约参数 T 的取值需要权衡的原因。第二，论文观察到 ECC 漏检的数据损坏，存储层的端到端校验（checksum）因此不可或缺；设计说明没有描述数据校验，[project/3fs 运维篇](../project/3fs/3fs-operations.md)基于源码对 checksum 有讨论。
 
