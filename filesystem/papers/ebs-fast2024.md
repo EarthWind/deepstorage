@@ -13,6 +13,7 @@
 > 相关文档：
 > - [盘古 2.0（FAST 2023）精读](pangu-fast2023.md)：EBS2 起的存储底座；盘古论文中的流量放大、FPGA 压缩、RDMA 等是 EBS 的"下半身"。
 > - [Fisc（FAST 2023）精读](fisc-fast2023.md)：同样建在盘古之上的云原生文件存储接入层。
+> - [DisCoGC（FAST 2026）精读](discogc-fast2026.md)：字节跳动架构几乎相同的块存储 ByteDrive，在 GC 环节用 discard 代替搬数据，可与本文的前台 EC/压缩路线对照。
 > - 综述：[客户端与通用技术中的 EBS 小节](client-and-general-techniques.md#42-whats-the-story-in-ebs-glory-evolutions-and-lessons-in-building-cloud-block-store)、[工业界生产系统](industry-production-systems.md)。
 
 ## 目录
