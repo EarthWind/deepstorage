@@ -222,20 +222,22 @@
 
 - **论文 1**：Z. Liang, J. Lombardi, M. Chaarawi, M. Hennecke, "DAOS: A Scale-Out High Performance Storage Stack for Storage Class Memory", SCFA 2020（Supercomputing Frontiers Asia），LNCS 12082, pp. 40-54
 - **论文 2**：M. Hennecke 等, "DAOS Beyond Persistent Memory: Architecture and Initial Performance Results", ISC High Performance 2023 Workshops（Springer LNCS）
-- **机构**：Intel（现由 HPE/社区主导，Linux Foundation 项目）
+- **机构**：论文 1 作者来自 Intel 与 Lenovo（Hennecke）；项目现由社区主导（Linux Foundation 旗下 DAOS Foundation）
 - **链接**：https://doi.org/10.1007/978-3-030-48842-0_3 ；https://link.springer.com/chapter/10.1007/978-3-031-40843-4_26 ；https://docs.daos.io
-- **目标硬件**：Intel Optane PMem（元数据+小 IO）+ NVMe SSD（大 IO）+ RDMA/libfabric；2023 版转向纯 NVMe
+- **精读**：论文 1 见 [daos-scfa2020.md](daos-scfa2020.md)
+- **目标硬件**：Intel Optane PMem（元数据+小 IO）+ NVMe SSD（大 IO）+ libfabric（Omni-Path/InfiniBand，也可用 TCP）；2023 版转向纯 NVMe
 
 ### 核心设计
 
 - 完全用户态、绕过内核的对象存储栈（严格说是对象存储 + 其上的 POSIX 文件系统层 libdfs/dfuse，在 HPC 语境下作为并行文件系统使用）。
-- **介质分工**：小 IO 与元数据直接落 PMem（PMDK 事务，字节寻址，作为一等存储介质而非缓存）；大块 IO 经 SPDK 落 NVMe SSD——按 IO 尺寸选介质，任意对齐/大小都能拿到高带宽与高 IOPS。
-- shared-nothing：每个 engine 独占核/盘/网口，Argobots 用户态调度；多副本或 EC，客户端直连所有 engine。
+- **介质分工**：全部内部元数据、key 索引与延迟敏感的小 IO 直接落 PMem（PMDK，字节寻址 load/store，作为一等存储介质而非缓存）；大块 IO 经 SPDK 落 NVMe SSD，SSD 写完成后在 PMem 中建索引。多版本数据模型使小写/不对齐写无需读-改-写。
+- 服务端每个请求一个 Argobots 用户级线程，网络（Mercury/libfabric）与 SPDK 都用轮询推进；对象 ID 编码副本/EC 策略、算法放置，客户端直连所有 engine，副本与 EC 写都由各参与者 RDMA 拉客户端缓冲区。（"每个 engine 独占核/盘/网口"的部署方式来自 DAOS 文档，SCFA'20 论文未描述。）
 - **"Beyond PM"（2023）**：Optane 停产后推出 Metadata-on-SSD 架构——元数据结构改为 DRAM 常驻 + WAL 落 NVMe + checkpoint，模拟 PM 的低延迟持久化语义。这是"PM 设计如何退化回 SSD"的教科书案例。
 
 ### 关键实验结果
 
-- IO500 榜单多年霸榜（ISC/SC 各期，10 节点与全系统组）；SCFA'20 论文展示任意 IO 尺寸下接近介质极限的带宽/IOPS；Aurora 超算（Exascale）的存储底座。
+- SCFA'20 论文只有 IO500 SC19 结果（DAOS 0.6，8 台存储节点、每台 12 条 Optane DCPMM，未提 NVMe）：10 节点挑战榜总排名第 1、带宽分第 1（easy 带宽低于 Lustre/SuperPOD，优势来自 hard 负载），元数据分约为第二名 3 倍；全榜第 2，仅 26 个客户端节点。论文没有不同 IO 尺寸扫描、延迟或故障实验。
+- 论文之外：此后 IO500 多期位居前列；Aurora 超算（Exascale）的存储底座。
 
 ### 局限
 
@@ -244,7 +246,7 @@
 ### 设计启示
 
 - **按 IO 尺寸/类型分介质**是通用原则：元数据服务的复制日志与热点元数据可走"电容 DRAM/低延迟 SSD WAL + checkpoint"（正是 DAOS Beyond-PM 的结构）；存储节点大块追加写走普通 NVMe 的顺序带宽。
-- 用户态 IO 栈（SPDK）+ 每盘单线程 shared-nothing 引擎是存储节点达成 TB/s 级聚合带宽的成熟路线；DAOS 证明了该路线在万级盘规模的可运维性。
+- 用户态 IO 栈（SPDK）+ 用户级线程轮询的 shared-nothing 引擎是存储节点达成 TB/s 级聚合带宽的成熟路线；SCFA'20 论文本身只在 8 台存储节点上验证，大规模可运维性来自 Aurora 等后续生产部署。
 
 ---
 
