@@ -14,6 +14,7 @@
 > - [元数据扩展性综述 §2.8](metadata-scalability.md#28-hmfs-accelerating-distributed-filesystem-metadata-service-via-decoupling-directory-semantics-from-metadata-indexingsocc-2025)：本文的简述版。
 > - [InfiniFS（FAST 2022）精读](infinifs-fast2022.md)：同一作者（Wenhao Lv）的前作，HMFS 沿用其按目录分区方案，并把它作为基线。
 > - [SingularFS（ATC 2023）精读](singularfs-atc2023.md)：同组（Hao Guo）的前作，同样在 PM 上做无日志元数据更新，是 HMFS 最强的基线。
+> - [MesaFS（EuroSys 2026）精读](mesafs-eurosys2026.md)：同组同期工作，把同样的思路用在 NVMe SSD 上（目录间哈希 + 目录内 WO-HTree，父目录延迟持久化）。
 > - [Mantle（SOSP 2025）精读](mantle-sosp2025.md)、[CFS（EuroSys 2023）精读](cfs-eurosys2023.md)：同样讨论"目录语义 / 元数据拆分"，但关注点在分区与协调，而不是单机存储引擎。
 
 ## 目录

@@ -213,15 +213,16 @@ POSIX 语义要求逐级检查路径上每一级目录的存在性与权限。�
 
 ### 2.10 MesaFS: An I/O-Efficient Metadata Service for Distributed File Systems（EuroSys 2026）
 
-- **作者/机构**：Hao Guo、Jiwu Shu、Youyou Lu，清华大学
-- **会议/年份**：ACM EuroSys 2026
+- **作者/机构**：Hao Guo、Jiwu Shu、Youyou Lu（通讯作者），清华大学 / BNRist
+- **会议/年份**：ACM EuroSys 2026（论文集第 160–175 页）
 - **链接**：https://dl.acm.org/doi/10.1145/3767295.3803573
-- **解决的问题**：元数据服务的持久化 I/O 效率——现有系统一次元数据更新往往触发多次 SSD 写（journal、索引、有序性维护），SSD 带宽利用率仅 8%–37%。
+- **解决的问题**：元数据服务的持久化 I/O 效率——客户端缓存解决路径解析后，瓶颈转到元数据存储：一次更新被拆成多次 KV 写并需日志保证崩溃一致（拆分更新），为支持 ls 还要维护全序（布局有序）。作者仿真的 InfiniFS 在 3 台服务器上只达到裸 SSD 性能的 8.4%–37.2%。
 - **核心设计**：
-  - **invariant-aware ordered updates**：把一次元数据更新拆分后允许**部分完成**——只要目录不变式（invariants）最终满足或可在崩溃恢复时修复，即可省去为原子性追加的额外写，使多数元数据更新**只需一次 SSD 写**。
-  - **semi-ordered metadata layout**：半有序布局，避免为维护全序而产生的搬移/合并写放大。
-- **关键实验结果**：达到裸 SSD 性能的 **62.0%–95.1%**（对比：按 InfiniFS 方案模拟仅 8.4%–37.2%）。
-- **局限性**：崩溃恢复逻辑更复杂（需修复不变式）；面向 SSD 单机引擎层，不解决分区/rename 等分布式问题。
+  - **invariant-aware ordered updates**：基于"父目录 ctime/mtime 等于子项 create/delete 时间最大值、nlink 等于 2 加子目录数"和"元数据 ID 唯一"两条不变式，先同步写子项、父目录更新缓冲在内存合并写，崩溃后全盘扫描重算；rename 先写同 ID 的新元数据（带临时 backpointer）再标记旧的失效，不用 2PC。create/delete 只需 1 次同步 KV 写，rename 2 次。
+  - **semi-ordered metadata layout（MesaKV）**：目录间哈希表（存目录内容元数据）+ 每个目录一棵 WO-HTree（按名字哈希排序，叶满时把叶子替换成内部节点，O(1) 分裂）；一页即一次原子写（依赖 NVMe AWUPF），80% 更新 1 次写、平均 1.4 次。
+- **关键实验结果**：达到裸 SSD 性能的 **62.0%–95.1%**（InfiniFS 仿真仅 8.4%–37.2%）；单服务器 create/delete 至少 1.75×/1.93×；3 台服务器 mkdir/rmdir/rename 至少 3.90×/4.67×/3.58×；分项分析中 create 吞吐从约 15k（RocksDB + 事务）提升到约 335k ops/s；崩溃恢复 518 万文件/s。
+- **局限性**：崩溃后需全盘扫描修复不变式（1 亿文件约 19 秒）；单页原子写依赖 SSD 的 AWUPF；分区沿用 InfiniFS，目录 rename 集中到服务器 0；只测到 3 台服务器、零长度文件；多个基线不同步落盘，持久性弱于 MesaFS。
+- **逐节精读**：[mesafs-eurosys2026.md](mesafs-eurosys2026.md)
 - **设计启示**：元数据落盘路径的写放大值得量化：如果使用 RocksDB，一次 create 实际写了 WAL + memtable flush + compaction 多份。可借鉴"以不变式而非全量原子性为目标"的思路设计精简 journal，或按 MesaFS 方式定制半有序布局。
 
 ### 2.11 SwitchFS: Asynchronous Metadata Updates for Distributed Filesystems with In-Network Coordination（EuroSys 2026）
@@ -264,7 +265,7 @@ POSIX 语义要求逐级检查路径上每一级目录的存在性与权限。�
 | Mantle (SOSP'25) | TafDB 分片（全量）+ 每 namespace 单机 IndexNode（目录骨架） | IndexNode 单 RPC lookup | 环检测 offload 至 IndexNode；delta 更新 | TafDB | 100 亿对象/namespace；1.89M lookup/s；生产 1.5–2 年 |
 | HMFS (SoCC'25) | 按目录分区（同 InfiniFS）；PM 哈希索引 + 目录内链表 | 客户端缓存 + hash 点查 | 8/16 字节原子写 + 有序写，按需恢复；rename 日志 + 2PC | PM 哈希表（DASH） | stat 为 SingularFS 1.8×；120 亿文件 13.4/34.7 Mops/s |
 | FalconFS (NSDI'26) | 文件按名 hash 分区；目录 namespace 惰性全复制 | 服务端本地解析（stateless client） | 协调者 2PL + 2PC，广播失效 dentry 副本 | 定制 PostgreSQL（每 MNode） | 万卡 NPU 生产 1 年；训练吞吐至 12.81× |
-| MesaFS (EuroSys'26) | 单引擎层工作（不改分区） | — | —（不变式感知恢复） | SSD 半有序布局，单次写更新 | 62–95.1% 裸 SSD 性能 |
+| MesaFS (EuroSys'26) | 按目录分区（同 InfiniFS）；目录间哈希 + 目录内 WO-HTree | 客户端缓存 + 版本号惰性失效 | 有序写 + 父目录延迟持久化 + 临时 backpointer；目录 rename 集中到服务器 0 | MesaKV（SSD，单页原子写） | 62.0–95.1% 裸 SSD 性能 |
 | SwitchFS (EuroSys'26) | 常规分区 + 交换机跟踪目录状态 | 常规 | 异步 delta，读时合并 | —（协调面创新） | 争用下延迟/吞吐显著改善（待确认） |
 
 ---
