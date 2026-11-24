@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Facebook's Tectonic Filesystem — 深度解读</title>
+<style>
+:root{--text:#1a1a1a;--bg:#fafaf8;--accent:#2563eb;--muted:#6b7280;--border:#e5e7eb;--code-bg:#f3f4f6}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"PingFang SC","Noto Serif SC",serif;color:var(--text);background:var(--bg);line-height:1.85;padding:2.5rem 1.5rem;max-width:720px;margin:0 auto;font-size:17px}
+h1{font-size:2rem;margin:0 0 .3rem;line-height:1.3}
+h2{font-size:1.35rem;margin:2.8rem 0 .8rem;color:var(--accent);padding-bottom:.4rem;border-bottom:1px solid var(--border)}
+h3{font-size:1.1rem;margin:1.5rem 0 .5rem;color:#333}
+.meta{color:var(--muted);font-size:.9rem;margin-bottom:2.5rem;line-height:1.8}
+.meta a{color:var(--accent);text-decoration:none}
+blockquote{border-left:3px solid var(--accent);padding:.6rem 1.2rem;margin:1.5rem 0;background:#f0f4ff;border-radius:0 8px 8px 0}
+pre{background:var(--code-bg);padding:1rem 1.2rem;border-radius:8px;overflow-x:auto;font-size:.85rem;line-height:1.5;margin:1.5rem 0;border:1px solid var(--border)}
+code{font-family:"SF Mono","Fira Code",monospace;font-size:.9em}
+p{margin:1rem 0}
+strong{color:#111}
+table{width:100%;border-collapse:collapse;margin:1.5rem 0;font-size:.93rem}
+td,th{border:1px solid var(--border);padding:.6rem .9rem;text-align:left}
+th{background:#f9fafb;font-weight:600}
+.summary-box{background:linear-gradient(135deg,#f0f4ff,#faf5ff);padding:1.5rem;border-radius:12px;margin:1.5rem 0}
+.summary-box h3{margin:0 0 .5rem;color:var(--accent)}
+.golden{font-size:1.25rem;font-weight:600;color:var(--accent);text-align:center;padding:2rem 1rem;border-top:2px solid var(--accent);border-bottom:2px solid var(--accent);margin:2.5rem 0;line-height:1.5}
+figure{margin:1.8rem 0}
+figure img{width:100%;border-radius:10px;border:1px solid var(--border)}
+figcaption{color:var(--muted);font-size:.85rem;text-align:center;margin-top:.4rem}
+.ps{color:var(--muted);font-size:.92rem}
+@media(max-width:600px){body{font-size:16px;padding:1.2rem 1rem}h1{font-size:1.5rem}}
+</style>
+<!-- KaTeX -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous"
+  onload="renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}]})"></script>
+<!-- Mermaid -->
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js" integrity="sha384-WmdflGW9aGfoBdHc4rRyWzYuAjEmDwMdGdiPNacbwfGKxBW/SO6guzuQ76qjnSlr" crossorigin="anonymous"></script>
+<script>mermaid.initialize({startOnLoad:true,theme:'default',securityLevel:'loose'});</script>
+</head>
+<body>
+
+<h1>每存 1 字节，要买 5.3 字节的硬盘：Facebook 是怎么把这笔账算回来的</h1>
+<div class="meta">
+论文：Satadru Pan, Theano Stavrinos, Yunqiao Zhang, … , Ethan Katz-Bassett, Wyatt Lloyd. <em>Facebook's Tectonic Filesystem: Efficiency from Exascale</em>. USENIX FAST 2021, pp. 217–231<br>
+链接：<a href="https://www.usenix.org/conference/fast21/presentation/pan">会议页面</a> · <a href="fast21-pan.pdf">本地 PDF</a> · <a href="deep-read.md">本仓库逐章精读</a> · <a href="README.md">10 张图解</a><br>
+代码状态：❌ 本文未提供公开代码。Tectonic 是 Meta 内部系统，论文和检索都没有找到开源实现；它依赖的组件中，RocksDB 与 CacheLib 是开源的，元数据底座 ZippyDB 未开源。<br>
+风格：storytelling · 文中英文引文均摘自论文原文，标注"PS"的段落是笔者个人看法
+</div>
+
+<div class="summary-box">
+<h3>先给结论</h3>
+<p>Tectonic 是 Facebook（现 Meta）的数据中心级文件系统：一个集群就能装下整个数据中心、上 EB 级的数据。它把原来分散在 Haystack、f4 和几十个 HDFS 集群里的照片与数仓数据合并到一起，靠三件事撑住：元数据分层并按 hash 打散、按"流量组"而不是按应用分资源、让客户端针对每种租户定制读写方式。结果是数仓集群数降到原来的 1/10，Blob 存储的有效复制因子从 5.3 倍降到约 2.8 倍，性能和原来的专用系统持平。</p>
+</div>
+
+<h2>1. 一笔怎么看都不划算的账</h2>
+
+<p>先问你一个问题：你往 Facebook 上传一张 2 MB 的照片，Facebook 要为它买多少硬盘？</p>
+
+<p>直觉答案大概是"存三份，6 MB 左右"。2010 年代的 Facebook 也是这么设计的：热照片放在 Haystack 里，三副本，再叠一层 RAID-6，理想的有效复制因子是 <strong>3.6 倍</strong>。可实际跑下来，这个数字变成了 <strong>5.3 倍</strong>（§2.1）。你那张 2 MB 的照片，背后占着 10.6 MB 的硬盘。</p>
+
+<p>多出来的 1.7 倍去哪了？答案有点反直觉：<strong>不是装数据装满了，是硬盘"转不过来"了。</strong>硬盘越做越大，但每块盘每秒能做的随机读写次数（IOPS）十几年来几乎没变。于是每 TB 容量分到的 IOPS 越来越少。热照片访问频繁，为了凑够 IOPS，Facebook 只能多买硬盘，买回来的容量却空着。</p>
+
+<p>与此同时，在同一个数据中心的另一头，数据仓库正为另一种病头疼：HDFS 只有一个 NameNode 管元数据，一个集群装不了多少文件，于是一个数据中心要开几十个 HDFS 集群。一边是 Haystack 的硬盘容量闲着，一边是数仓的磁盘在峰值时不够用，两边的资源却没法互相借。</p>
+
+<h2>2. 为什么会这样：一座座"孤岛"</h2>
+
+<p>Facebook 当时的存储，论文用了一个词：<em>constellation</em>，星座。每个专用系统都是一颗星，各自为某一种负载调到最优，彼此之间不连通。</p>
+
+<p>打个比方：这像几户人家各租一套房，每家都按自己最忙那天的需求配了厨房。A 家过年请客，厨房不够用；隔壁 B 家常年下馆子，厨房一年开不了几次火。单看每家都没毛病，合起来看，城里一半的厨房在吃灰。</p>
+
+<table>
+<tr><th>旧系统</th><th>负载</th><th>毛病（§2）</th></tr>
+<tr><td>Haystack</td><td>热 Blob（刚上传的照片、视频）</td><td>IOPS 不够，被迫多买盘，有效复制因子从 3.6× 涨到 5.3×</td></tr>
+<tr><td>f4</td><td>温 Blob（老照片）</td><td>RS(10,4) 编码、两个数据中心，复制因子 2.8×；IOPS 富余却借不出去</td></tr>
+<tr><td>HDFS（几十个集群）</td><td>数据仓库（Spark、Presto、AI 训练数据）</td><td>单 NameNode 限制集群规模；数据集要在集群间"装箱"，大数据集还得拆开放</td></tr>
+</table>
+
+<p>更糟的是趋势。越来越多的媒体是"阅后即焚"型的：上传后在 Haystack 里待几天就删了，根本活不到被迁去 f4 的那一天。于是越来越多的数据按 5.3 倍的最贵价格存着。</p>
+
+<p>数仓那边的"装箱问题"也很磨人：每个数据集要找一个容量和吞吐都还有余量的 HDFS 集群放进去，这是一个二维装箱问题。数据集太大放不进单个集群，就得拆开，计算引擎再自己去几个集群里拼。存储的边界，变成了上层应用的负担。</p>
+
+<p>所以 Facebook 需要的不是再做一个更好的专用系统，而是一个<strong>足够大、能把大家都装进去，又不让任何一家吃亏</strong>的系统。</p>
+
+<h2>3. 核心洞察：把孤岛合成一块大陆</h2>
+
+<p>Tectonic 这个名字就是答案：板块构造。把漂着的小岛合成一整块大陆，一个集群覆盖整个数据中心。合并之后，照片的 IOPS 需求和数仓的带宽需求在同一批硬盘上互补，谁忙谁用。</p>
+
+<p>但"合并"四个字说起来容易，做起来要过三道关，论文开篇就列了出来：</p>
+
+<blockquote>"In building Tectonic, we confronted three high-level challenges: scaling to exabyte-scale, providing performance isolation between tenants, and enabling tenant-specific optimizations."<br>
+（构建 Tectonic 时，我们面对三个高层挑战：扩展到 EB 级、租户之间的性能隔离、支持租户各自的定制优化。）—— §1</blockquote>
+
+<p>说白了：第一，装得下；第二，住在一起不打架；第三，合租以后每家的日子不能比独居时差。下面一关一关看。</p>
+
+<h2>4. 方法详解：三道关怎么过</h2>
+
+<p>先看全貌。Tectonic 一个集群里只有两样东西有状态：存数据的 <strong>Chunk Store</strong> 和存目录树的 <strong>Metadata Store</strong>。剩下的组件全是无状态的，包括所有读写都要经过的 <strong>Client Library</strong>，以及做垃圾回收、修复、搬迁的后台服务。</p>
+
+<figure><img src="01-architecture.png" alt="Tectonic 整体架构图解"><figcaption>图解 1：Tectonic 架构。对应论文 Figure 2：Client Library 依次查 Name、File、Block 三层元数据，再直接读写存储节点。</figcaption></figure>
+
+<pre class="mermaid">
+flowchart LR
+    APP["Tenant<br/>Blob / Warehouse"] --> CL["Client Library<br/>stateless"]
+    CL -->|1 lookup dir| NL["Name layer"]
+    CL -->|2 list blocks| FL["File layer"]
+    CL -->|3 locate chunks| BL["Block layer"]
+    NL --- KV[("ZippyDB<br/>Paxos + RocksDB")]
+    FL --- KV
+    BL --- KV
+    CL -->|4 read or write chunks| CS[("Chunk Store<br/>36 HDD + 1 TB SSD per node")]
+</pre>
+
+<p>回到开头那张照片。上传时，Client Library 在 Name 层找到目录，在 File 层找到文件对应的 block，在 Block 层找到这个 block 的 chunk 放在哪几块盘上，然后直接把数据写给那几台存储节点。存储节点只认识 chunk，不知道什么是 block、什么是文件。这种"笨"恰恰是它能扩展到 EB 级的原因：chunk 的数量随节点数线性增长，没有任何全局结构需要随之膨胀。</p>
+
+<h3>4.1 第一关：EB 级的元数据，热点怎么办</h3>
+
+<p>HDFS 的上限卡在元数据：一台 NameNode 把所有目录和文件信息放在内存里。Tectonic 的做法分两步。第一步是<strong>拆层</strong>：目录树（Name 层）、文件到 block 的映射（File 层）、block 到磁盘的映射（Block 层）各管各的，都存在 ZippyDB 这个分片键值存储里（论文 Table 1）。第二步是<strong>按 ID 做 hash 分片</strong>：</p>
+
+<blockquote>"Unlike ADLS, Tectonic hash-partitions each metadata layer rather than using range partitioning. Hash partitioning effectively avoids hotspots in the metadata layer."<br>
+（与 ADLS 不同，Tectonic 对每个元数据层做 hash 分区而不是范围分区。hash 分区有效避免了元数据层的热点。）—— §1</blockquote>
+
+<p>为什么 hash 比范围好？想象一座图书馆按书名首字母分书架。某天全校都在找"数据库"开头的书，S 那几排书架前挤满了人，其他书架冷冷清清，这就是范围分区。hash 分区相当于把书随机分到 100 个抽屉里，按书号直接算出在哪个抽屉，热门书自然散开。数仓作业常常一口气读一批名字相近的目录，在范围分区下它们会挤在同一个分片上，hash 分区把它们打散了（§6.3）。</p>
+
+<figure><img src="03-metadata-layers.png" alt="分层元数据图解"><figcaption>图解 2：三层元数据的键、值与分片方式（对应论文 Table 1），以及范围分区与 hash 分区的热点对比。</figcaption></figure>
+
+<p>还有一个省事的小设计叫"展开存储"。目录 d1 里有 foo 和 bar 两个文件，Tectonic 不存一个 <code>d1 → [foo, bar]</code> 的大列表，而是存两个键 <code>(d1, foo)</code>、<code>(d1, bar)</code>。目录里有几百万个文件时，新建一个文件不用把整个列表读出来再写回去，列目录就是一次前缀扫描。</p>
+
+<p>代价是一致性。ZippyDB 只保证单个分片内的事务，所以 Tectonic 只承诺同一目录内的操作是强一致的（文件放在父目录的分片里），跨目录移动则不是原子的。论文专门举了 rename 和"覆盖式 create"交错执行可能把新文件抹掉的例子，解法是让 rename 的最后一步在分片内事务里检查文件没被动过（§3.3）。写入方面，每个文件同一时间只允许一个写者，用 write token 保证：新写者打开文件就换掉 token，旧写者的元数据更新会失败。</p>
+
+<h3>4.2 第二关：住在一起，怎么不打架</h3>
+
+<p>合租最怕的是邻居。你上传照片时，恰好有个数仓的 Spark 作业在扫一张几百 TB 的表。照片请求很小，要求几十毫秒内完成；Spark 的请求很大，在乎的是吞吐。如果它们在同一块盘前排队，照片请求会被大 IO 卡住。</p>
+
+<p>最直接的办法是给每个应用分配资源，但 Facebook 有几百个应用，管理成本太高；按租户分又太粗，同一个租户里既有用户在等的生产流量，也有后台的垃圾回收。论文的取舍是中间那一层：</p>
+
+<blockquote>"Instead of managing resources among hundreds of applications, Tectonic only manages resources among tens of traffic groups."<br>
+（Tectonic 不在几百个应用之间管理资源，而只在几十个流量组之间管理。）—— §1</blockquote>
+
+<p>每个集群大约 50 个 <strong>TrafficGroup</strong>，每个组属于三档 <strong>TrafficClass</strong> 之一：Gold（延迟敏感）、Silver（普通）、Bronze（后台）。存储容量按租户硬配额，手动调整；IOPS、元数据 QPS 这类"瞬时资源"每个组有保证配额，空闲部分按"同租户其他组 → 其他租户"的顺序借出，每一步都 Gold 优先（§4.1）。借来的流量取借出方和借入方中较低的那一档，这样一块盘上各档流量的比例不会因为借用而变化。</p>
+
+<figure><img src="05-multitenancy-hierarchy.png" alt="多租户资源层级图解"><figcaption>图解 3：Tenant → TrafficGroup → TrafficClass 的层级，以及空闲资源的借用顺序（§4.1）。</figcaption></figure>
+
+<p>执行分两层。全局层面，Client Library 里有个限流器，用近实时的分布式计数器加改进的漏桶算法统计每个组的用量，超额的请求在客户端就被延迟或拒绝，不会白白发到存储节点去。本地层面，存储节点用加权轮询（WRR）调度，再加三条专门保护 Gold 的规则：低档请求如果等得起就让位；有 Gold 在排队时，非 Gold 的在途 IO 数有上限；Gold 等太久，干脆暂停给这块盘发非 Gold 请求，防止磁盘自己重排把 Gold 压到后面。</p>
+
+<p>这像医院急诊：病人不按科室一个个排，而是先分诊成红黄绿三档。红色病人优先，但绿色病人也有保底的号源；某个诊室空着，先给本科室的黄色病人，再借给隔壁科室。分诊台只管三档、几十个组，不用记住每个病人。</p>
+
+<h3>4.3 第三关：合租以后，每家的日子不能变差</h3>
+
+<p>这一关最见功力。照片和数仓对写入的诉求几乎相反，Tectonic 的解法是把选择权交给客户端：Client Library 以 chunk 为粒度直接读写，持久性方案按<strong>每次写入</strong>配置，而不是像 HDFS 那样按目录配置（§5）。同一个系统，两种写法。</p>
+
+<p><strong>数仓：先问谁有空，再把数据发过去。</strong>数仓的文件是写一次、读多次，关闭前对读者不可见，所以可以把数据攒满一整个 block（比如 72 MB），在内存里做 RS(9,6) 编码，切成 9 个数据 chunk 加 6 个校验 chunk。和三副本比，RS(9,6) 只多存 $\frac{9+6}{9}\approx1.67$ 倍，而三副本是 3 倍。</p>
+
+<p>写的时候用了一招 hedged quorum 写：</p>
+
+<blockquote>"Instead of sending the chunk write payload to extra nodes, Tectonic first sends reservation requests ahead of the data and then writes the chunks to the first nodes to accept the reservation."<br>
+（Tectonic 不向额外的节点发送 chunk 数据，而是先在数据之前发出预留请求，再把 chunk 写给最先接受预留的节点。）—— §5.1</blockquote>
+
+<p>具体数字是：向 19 个故障域不同的节点发预留请求，比需要的 15 个多 4 个；数据只写给最先应答的 15 个；其中 14 个成功就向应用确认，第 15 个失败了由后台离线修复。这像周五晚上订餐厅：你不会带着一大家子人挨家去碰运气，而是先给 19 家打电话问有没有位，最先说"有"的那几家才去。电话便宜，搬人贵。</p>
+
+<figure><img src="07-warehouse-writes.png" alt="数仓写路径图解"><figcaption>图解 4：整块缓冲、RS(9,6) 编码、19 选 15 的预留、14/15 确认（§5.1，对应 Figure 3a）。</figcaption></figure>
+
+<p><strong>Blob：先求快，再求省。</strong>照片很小，用户等着看，不能攒满 72 MB 再写。Tectonic 把许多 blob 追加进同一个日志结构文件，每次追加写三副本，两个节点写盘成功就确认。问题在于：第三个副本可能慢半拍，三份数据长度不一，读者该信哪一份？论文的答案是严格的顺序，先把新的块大小记进元数据，再告诉用户成功：</p>
+
+<blockquote>"If block metadata reports a block size of S, then all preceeding bytes in the block were written to at least two storage nodes."<br>
+（如果 block 元数据报告的大小是 S，那么 block 中 S 之前的所有字节都已经写到了至少两个存储节点上。）—— §5.2</blockquote>
+
+<p>这像快递员的规矩：包裹先在系统里登记"已签收"，再给你发短信。只要系统里显示到第 S 件，前面每一件都至少在两个仓库里有存货，读者只读到 S 就绝不会扑空。block 写满、封存（seal）以后，客户端再把它从三副本转码成 RS(10,4)，每个目标节点只需要一次大 IO。要是在每次追加时就做 RS 编码，一次小写要动 14 块盘；先副本后转码，小写只动 3 块盘，空间却最终省到 1.4 倍。</p>
+
+<table>
+<tr><th>对比项</th><th>数据仓库写</th><th>Blob 写</th><th>HDFS（旧）</th></tr>
+<tr><td>写入粒度</td><td>整块（如 72 MB）</td><td>小块追加</td><td>流式追加</td></tr>
+<tr><td>持久性</td><td>直接 RS(9,6)；短期数据 RS(3,3)</td><td>先三副本，seal 后转码 RS(10,4)</td><td>按目录配置</td></tr>
+<tr><td>确认条件</td><td>15 个 chunk 中 14 个成功</td><td>3 副本中 2 个成功，且元数据已提交块大小</td><td>流水线全部副本</td></tr>
+<tr><td>优化目标</td><td>文件总写入时间、空间、带宽</td><td>单次追加延迟 + 最终空间</td><td>—</td></tr>
+<tr><td>配置粒度</td><td colspan="2">每次调用（per-call），由 Client Library 决定</td><td>每目录</td></tr>
+</table>
+
+<p class="ps">PS：这一节是全文我最喜欢的部分。"通用系统做不到专用性能"是存储圈的老生常谈，Tectonic 的回应很朴素：把系统的底座做得足够"笨"（Chunk Store 只认 chunk），把聪明留给离业务最近的客户端。</p>
+
+<h2>5. 实验效果：账到底算回来没有</h2>
+
+<p>论文没有做传统意义上的跑分对比，而是直接摆出生产集群的数据。先看规模（Table 2）：</p>
+
+<table>
+<tr><th>指标</th><th>数值</th><th>换个说法</th></tr>
+<tr><td>容量</td><td>1590 PB</td><td>约 1.6 EB，按每张照片 2 MB 算，能装近 8000 亿张</td></tr>
+<tr><td>已用</td><td>1250 PB</td><td>约 70% 的容量</td></tr>
+<tr><td>文件 / block</td><td>107 亿 / 150 亿</td><td>按单个 HDFS NameNode 约 1 亿文件的常见估计（非本文数据），相当于上百个 HDFS 集群</td></tr>
+<tr><td>存储节点</td><td>4208</td><td>每台 36 块硬盘，约 15 万块盘</td></tr>
+</table>
+
+<p>最有说服力的是 Table 3。这个集群里，Blob 和数仓各占一半空间。论文用"磁盘时间"来衡量负载，也就是一块盘忙着的时间占比：</p>
+
+$$\text{disk time} = \sum_{\text{IO}} t_{\text{IO}}, \qquad \text{例：1 秒内 10 个 IO，每个 50 ms，则这块盘忙了 } 500/1000 \text{ ms}$$
+
+<p>为什么不用 IOPS 或带宽？因为照片的小请求受 IOPS 限制，数仓的大请求受带宽限制，单看哪一个都不公平。磁盘时间把两者放到了同一把尺子上。</p>
+
+<table>
+<tr><th>租户</th><th>独立部署时的供给</th><th>峰值 1</th><th>峰值 2</th><th>峰值 3</th></tr>
+<tr><td>数据仓库</td><td>0.51</td><td><strong>0.60</strong></td><td><strong>0.54</strong></td><td><strong>0.57</strong></td></tr>
+<tr><td>Blob 存储</td><td>0.49</td><td>0.12</td><td>0.14</td><td>0.11</td></tr>
+<tr><td>合计</td><td>1.00</td><td>0.72</td><td>0.68</td><td>0.68</td></tr>
+</table>
+
+<p>这张表的意思是：如果数仓单独一个集群，三天里每一个日峰值它都不够用（0.60、0.54、0.57 都超过 0.51），要多买约 <strong>17%</strong> 的硬盘才扛得住。而 Blob 单独一个集群，峰值也只用到供给的四分之一左右，剩下的全在吃灰。合到一起后，合计需求最高 0.72，远低于 1.00。开头那个"一家厨房不够、隔壁厨房吃灰"的比喻，在这里变成了实打实的数字。</p>
+
+<figure><img src="09-results.png" alt="关键结果图解"><figcaption>图解 5：按磁盘时间归一化的供需对比（对应论文 Table 3 与 Figure 4a/4b）。</figcaption></figure>
+
+<p>再看延迟。Figure 3b、3c 显示，Tectonic 上 Blob 的读写延迟和 Haystack 基本相当，用了 quorum append 的写延迟明显好于普通追加。Figure 3a 里，在 80% 负载的测试集群上，hedged quorum 写让 72 MB 整块写的 P99 延迟改善了约 20%。元数据方面（Figure 4c），每个分片上限 10K QPS，File 层和 Block 层的分片全部在线以下，Name 层只有约 1% 的分片因为装着特别热的目录碰到上限，靠退避重试消化掉了。</p>
+
+<p>还有两个数字值得记住：数仓的集群数量降到了原来的 <strong>1/10</strong>（§1）；Blob 的有效复制因子从 Haystack 的 5.3 倍降到约 <strong>2.8 倍</strong>（§2.1）。回到开头那张 2 MB 的照片，它背后的硬盘从 10.6 MB 变成了 5.6 MB 左右。</p>
+
+<h2>6. 深层意义：这篇论文留下了什么</h2>
+
+<p><strong>技术上</strong>，它把一套元数据扩展方案在 EB 级生产环境里跑通了：分层、hash 分片、状态下沉到成熟的分片 KV、元数据服务无状态。后来的 InfiniFS、CFS、Mantle 等论文都拿它当基线或对照，这套思路几乎成了大规模文件系统元数据的默认起点。</p>
+
+<p><strong>产业上</strong>，它给"要不要合并存储"这个问题提供了一份罕见的、带生产数据的答卷。很多公司都有类似的"星座"：对象存储一套、HDFS 一套、日志一套。Tectonic 告诉你，合并的收益不在省掉几台机器，而在于不同负载的峰谷能互相填平。前提是隔离做得足够好，让大家敢住在一起。</p>
+
+<p><strong>方法上</strong>，最值得学的是它的克制。论文直言它的多租户机制"does not aim to achieve optimal fair sharing"（不追求最优的公平共享，§7），只用几十个组、三个档位。它在 §6.4 也坦白：</p>
+
+<blockquote>"Tectonic's design generally prioritizes simplicity over efficiency."<br>
+（Tectonic 的设计总体上把简单放在效率之前。）—— §6.4</blockquote>
+
+<p>只有两处例外它选择了复杂：一是把需要 RS 重建的读限制在所有读的 10% 以内，防止"重建风暴"（一些节点过载 → 直接读失败 → 触发重建读，而 RS(10,4) 的重建读要 10 倍 IO → 更多节点过载）；二是让客户端直连存储节点，不经过代理，省掉每秒数 TB 数据的一跳网络。</p>
+
+<h2>7. 局限：它没解决的，和它绕开的</h2>
+
+<p>作者自己讲了不少（§6.5–6.7）。数仓迁过来后<strong>元数据延迟变高了</strong>：HDFS 的元数据操作在内存里完成，Tectonic 打开一个文件要跨 Name 层和 File 层发网络请求，计算引擎只好把原来逐个执行的 rename 改成并行。hash 分片也让<strong>递归列目录变得很贵</strong>，Tectonic 干脆不提供递归 list，也没有 <code>du</code>，目录用量靠定期汇总，数据可能是旧的。跨数据中心的远程访问也不适合客户端直连，只能转发给同机房的无状态代理。图存储这类要求 SSD 级低延迟的 KV 负载，它也还没覆盖。</p>
+
+<p>笔者再补两点。第一，跨目录 move 不是原子的，这对数仓和 Blob 无所谓，但很多依赖"rename 即提交"的应用（比如一些 Hadoop 输出提交协议）就得重新设计，这也是后来 FileScale、Mantle 等工作在补的课。第二，论文的评估几乎全是一个生产集群三天的数据，没有对照实验，也没有和 HDFS、Colossus 这类系统的同条件比较。"性能和专用系统相当"更多是工程结论，外人很难复现。再加上代码不公开，Hedged 写的 19/15/14 这类参数是怎么调出来的、换个负载是否成立，读者只能信。</p>
+
+<p class="ps">PS：论文里有一段很少被人提起，但我觉得最"真实"：规模到了这个量级，内存数据损坏是家常便饭（"in-memory data corruption is a regular occurrence"，§6.6）。他们的应对是在每次数据变换后，用逆变换还原再对校验和，哪怕逆变换（比如 RS 解码、解密）很贵也照做。另一个教训是 Chunk Store 的第一版把 block 按组一起编码以省元数据，结果"with only 5% of storage nodes unavailable, 80% of the block groups became unavailable for writes"（只要 5% 的存储节点不可用，80% 的 block 组就无法写入）。这两段比任何架构图都更能说明 EB 级系统是怎么一点点磨出来的。</p>
+
+<h2>8. 回到那张照片</h2>
+
+<p>你上传的那张照片，今天走的是这样一条路：Client Library 在 hash 打散的元数据里找到位置，把它追加到一个日志文件，两份副本落盘、块大小登记在案后，"上传成功"才弹出来。同一时刻，隔壁的 Spark 作业正在用同一批硬盘的空闲时间扫表，它的大 IO 被限制在不挡你路的范围内。几天后，这个 block 被封存，悄悄从三副本转成 RS(10,4)。你感觉不到任何变化，但为它买的硬盘少了将近一半。</p>
+
+<p>Tectonic 没有发明什么全新的算法：分层元数据有 ADLS 和 HopsFS，copyset 有现成的论文，hedging 来自"The Tail at Scale"。它做的是把这些零件拼在一起，在一个数据中心那么大的集群里证明：合并能省钱，而且不用牺牲任何一家租户。</p>
+
+<div class="golden">孤岛里的冗余叫浪费，汇成大陆就成了余量。</div>
+
+</body>
+</html>
