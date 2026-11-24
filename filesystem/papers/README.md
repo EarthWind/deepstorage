@@ -41,6 +41,7 @@
 - [DisCoGC（FAST 2026）](discogc-fast2026.md)：字节跳动 ByteDrive + ByteStore 的 discard 与 compaction 结合 GC。覆盖 compaction-only 的写放大/空间放大两难、ByteDrive 两层（Volume/Segment，LSM 索引、块级压缩）与 ByteStore（LogFile、chunk、自包含扇区的用户态文件系统 UFS）结构、三类生产 trace（表 1 重排核对）与连续写/覆盖分析、discard 五步流程、EC 损失与 cluster 损失（可超过 50%）及边界扩展与 cluster 对齐 EC 条带、批处理/并行度/流控、修正垃圾率与双模式 compaction、两阶段 trim 与 trim 过滤/合并、Mock discard 灰度与 WAL 崩溃一致性、位图压缩、生产与测试床评估（TCO −20%）、调参与监控处置规则，以及章节间口径不一致之处。
 - [Fisc（FAST 2023）](fisc-fast2023.md)：阿里巴巴面向云原生容器的文件系统接入层（后端为盘古）。覆盖重客户端与集中网络网关的问题刻画、两层功能聚合的轻量客户端（DPU agent + 存储侧 proxy）、文件粒度路由与存储感知故障处理、就近读、virtio-Fisc 设备与 FPGA 快路径、DPU 资源优化、vRPC 与端到端 QoS，以及评估数字中的不一致之处。
 - [Assise（OSDI 2020）](assise-osdi2020.md)：UW、KTH、KAIST、UT Austin 等把持久内存放在客户端本地的分布式文件系统（LineFS 的基础）。覆盖 NVM 各层延迟与价格、远端存储与客户端本地两种架构对比、LibFS/SharedFS/集群管理器结构、pessimistic 与 optimistic 两种崩溃一致模式、更新日志写路径与 RDMA 链式复制、分层读路径与温副本、CC-NVM 的前缀崩溃一致与层级租约委托、进程/OS/节点故障与 epoch 位图恢复、微基准与 LevelDB/Filebench/MinuteSort/Postfix 评估，以及摘要倍数（56×、6×、40×）的出处问题。
+- [Octopus+（ACM TOS 2021）](octopus-plus-tos2021.md)：清华把 RDMA 原语揉进文件系统内部机制的分布式持久内存文件系统（ATC 2017 Octopus 的期刊扩展）。覆盖 GlusterFS 在 NVM + RDMA 上约 99% 的软件开销与四个低效根源、DMS + 哈希分布数据服务器架构与 NVM 五区布局、共享持久内存池把远程 IO 拷贝从 7 次降到 4 次、client-active IO 与 CPU 加锁 + RDMA 解锁、`write_with_imm` 自识别 RPC、collect-dispatch 事务与 2PC 对比、目录集中化与持久跳表索引、操作日志元数据复制与客户端驱动数据复制、DDIO 下的写后 flush RPC 与 COW 故障原子性、相对 ATC'17 会议版的变化表、Optane 上的评估（Mkdir 软件延迟 6.3 µs、单服务器读 11.9 GB/s、自识别 RPC 4.1 Mops/s），并列出十余处图文不一致和六个未回答的设计问题。
 - [LineFS（SOSP 2021）](linefs-sosp2021.md)：KAIST、UT Austin、KTH 等把客户端本地 PM 分布式文件系统（基于 Assise）的后台任务卸载到第一代 BlueField SmartNIC。覆盖 Assise 与 Ceph 的客户端 CPU 账单、PCIe 与弱核两大卸载难点（直接卸载慢 30 倍以上）、LibFS / NICFS / 内核工作线程的分工、先持久后发布、共享前两级的发布与复制流水线、主动链式复制与低延迟/高吞吐连接分离、租约卸载与访问控制、主机崩溃时的独立 NICFS 模式、多租户干扰与 DMA 中断 vs 轮询的实验、压缩省带宽，以及引言与评估数字不一致、"好 X%"口径等问题。
 - [DPFS（SYSTOR 2023）](dpfs-systor2023.md)：IBM Research 与 VU Amsterdam 用现成 DPU（BlueField-2）+ 内核自带 virtio-fs 把云文件系统客户端整体卸载出租户主机。覆盖块层 vs 文件层卸载的 I/O 放大论证、DPFS-HAL / DPFS-FUSE / 可插拔后端三层框架、NFS（libnfs + XLIO）与 RAMCloud KV 后端、约 40 µs 框架开销与延迟分解、主机 CPU 4.4× 的微架构推导、单队列与队列深度等局限及后续内核多队列补丁，以及与 Fisc、LineFS 的对照。
 - [DAOS（SCFA 2020）](daos-scfa2020.md)：Intel 面向 Optane 持久内存 + NVMe 的全用户态开源分布式对象存储。覆盖传统并行文件系统的三层开销、PMDK/SPDK/libfabric 三块基石与介质分工、Argobots 每请求一个 ULT 的轮询式服务端（九步 I/O 流程）、128 位对象 ID 的算法放置、所有副本直接 RDMA 拉客户端数据的副本/EC 写与失败不等待的变种 2PC、去中心化重建、多版本消除读-改-写（含 EC 部分条带写）、端到端校验、libdfs/dfuse/拦截库的 POSIX 分层、IO500 SC19 图表读数（含论文未提的 easy 带宽落后），以及持久内存容量等数字矛盾。
@@ -84,6 +85,7 @@
 | DPFS (SYSTOR 2023) | 客户端与通用技术 | 新硬件（DPU 视角） |
 | DAOS (SCFA 2020) | HPC/AI 存储 | 新硬件（SCM/后 PM 演进视角） |
 | Assise (OSDI 2020) | 新硬件 | 精读文档 assise-osdi2020.md；与 LineFS 精读对照（LineFS 基于 Assise） |
+| Octopus+ (ACM TOS 2021) | 新硬件 | 精读文档 octopus-plus-tos2021.md；元数据扩展性（DMS 集中目录、collect-dispatch 事务视角），与 Assise 精读对照（服务器池化 vs 客户端本地） |
 
 ## 4. 论文总索引
 

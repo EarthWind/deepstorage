@@ -211,7 +211,7 @@
 | 2019 | Orion: A Distributed File System for Non-Volatile Main Memory and RDMA-Capable Networks | UCSD | FAST | 内核态 PM/RDMA 分布式文件系统，单边 RDMA 元数据访问 |
 | 2020 | Assise: Performance and Availability via Client-local NVM in a Distributed File System | UW / KTH / KAIST / UT Austin 等 | OSDI | 客户端本地 NVM 作为一致性缓存与复制起点 |
 | 2021 | LineFS: Efficient SmartNIC Offload of a Distributed File System with Pipeline Parallelism | KAIST 等 | SOSP（Best Paper） | 文件系统操作流水线卸载到 SmartNIC |
-| 2021 | Octopus+ | 清华 | ACM TOS | Octopus 的期刊扩展 |
+| 2021 | Octopus+: An RDMA-Enabled Distributed Persistent Memory File System | 清华 | ACM TOS | Octopus 的期刊扩展：目录集中到 DMS，新增操作日志元数据复制、客户端驱动数据复制与 DDIO 下的远程持久性，在真实 Optane 上重新评估 |
 | 2023 | DPFS: DPU-Powered File System Virtualization | IBM Research / VU Amsterdam | SYSTOR | 用 DPU 对虚拟机透明提供文件系统 |
 | 2024 | DPC: DPU-accelerated High-Performance File System Client | 重庆大学等 | ICPP | 文件系统客户端卸载到 DPU |
 | 2025 | Famfs | Micron | FAST poster + 内核 RFC | CXL 共享内存上的 fs-dax 文件系统 |

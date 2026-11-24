@@ -675,7 +675,7 @@ Varmail 的复制速率只有每秒几百 MB，所以故障窗口内用 PCIe 拷
 | 方向 | 代表 | 与 LineFS 的关系 |
 |------|------|----------------|
 | 基于磁盘的客户端-服务器 DFS | Ceph、Lustre、GPFS、GFS、HDFS | 侧重成千上万存储节点的扩展性和可用性；面对 PM 时因设计复杂和客户端-服务器架构而天然慢 |
-| PM 优化的客户端-服务器 DFS | Octopus（collect-dispatch 事务）、Clover（RDMA 管理远端存储、元数据放在应用侧） | 优化了通信开销，但访问远端存储的网络代价仍高 |
+| PM 优化的客户端-服务器 DFS | Octopus（collect-dispatch 事务，期刊版精读见 [octopus-plus-tos2021.md](octopus-plus-tos2021.md)）、Clover（RDMA 管理远端存储、元数据放在应用侧） | 优化了通信开销，但访问远端存储的网络代价仍高 |
 | 客户端本地 DFS | Orion（数据放本地 PM，元数据更新仍要与远端元数据服务器通信）、Assise（数据和元数据都放客户端节点，RDMA 复制） | 性能优于客户端-服务器模型，但要与应用共享主机资源，正是 LineFS 要解决的问题 |
 | SmartNIC 卸载 | Floem、ClickNP（网络功能）；AccelNet（TCP 与 SDN）；Tonic、hXDP（FPGA 网卡）；iPipe（actor 模型卸载 KV、分布式事务、实时分析）；E3、λ-NIC（微服务）；FairNIC、PANIC（网卡内的公平与隔离） | 同样想减轻主机 CPU 负担，但没有处理 DFS 特有的挑战：跨多个 SmartNIC 处理高度结构化的数据、复杂的一致性与持久性协议 |
 | 复制卸载 | Hyperloop（用 RDMA WAIT verb 和远程修改 RDMA 请求，把链式复制卸载到 RDMA 网卡） | 能在副本 CPU 繁忙时保持稳定尾延迟，但只关注复制事务；完整 DFS 还要处理共享文件协调、元数据一致性、崩溃一致性和 SmartNIC 的有效利用 |
