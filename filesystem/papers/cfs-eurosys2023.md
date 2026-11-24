@@ -10,7 +10,7 @@
 >
 > 注意区分：本文的 CFS 是**百度智能云文件存储 CFS**，不是京东的 ChubaoFS（SIGMOD 2019 论文也叫 "CFS"，现名 CubeFS）。
 >
-> 相关文档：[元数据扩展性综述中的 CFS 小节](metadata-scalability.md#23-cfs-scaling-metadata-service-for-distributed-file-system-via-pruned-scope-of-critical-sectionseurosys-2023)、[工业界生产系统中的 Baidu CFS 小节](industry-production-systems.md#5-baidu-cfseurosys-2023)、[InfiniFS（FAST 2022）精读](infinifs-fast2022.md)（CFS 的主要对比对象）、[Tectonic（FAST 2021）精读](tectonic-fast2021.md)。
+> 相关文档：[元数据扩展性综述中的 CFS 小节](metadata-scalability.md#23-cfs-scaling-metadata-service-for-distributed-file-system-via-pruned-scope-of-critical-sectionseurosys-2023)、[工业界生产系统中的 Baidu CFS 小节](industry-production-systems.md#5-baidu-cfseurosys-2023)、[InfiniFS（FAST 2022）精读](infinifs-fast2022.md)（CFS 的主要对比对象）、[Tectonic（FAST 2021）精读](tectonic-fast2021.md)、[λFS（ASPLOS '23）精读](lambdafs-asplos2023.md)（同以 HopsFS 为基线，方向正交：λFS 给代理层加弹性缓存，CFS 去掉代理层）。
 
 ## 目录
 
