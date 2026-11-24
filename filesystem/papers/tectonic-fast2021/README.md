@@ -4,11 +4,13 @@
 >
 > 机构：Facebook（现 Meta）、Princeton University、Columbia University
 >
-> 链接：<https://www.usenix.org/conference/fast21/presentation/pan> ；PDF：<https://www.usenix.org/system/files/fast21-pan.pdf>
+> 链接：<https://www.usenix.org/conference/fast21/presentation/pan> ；PDF：<https://www.usenix.org/system/files/fast21-pan.pdf>（本地副本：[fast21-pan.pdf](fast21-pan.pdf)）
 >
 > 精读日期：2026-11-16。文中**数字、表格与机制描述均摘自论文原文**（标注所在章节）；标注"解读"的段落是本文作者的分析与推论，不是论文原话。
 >
-> 相关文档：[工业界生产系统综述中的 Tectonic 小节](industry-production-systems.md#1-facebooks-tectonic-filesystem-fast-2021)、[元数据扩展性综述](metadata-scalability.md)、[论文清单](essential-papers-2000-2026.md)。
+> 图解：文中 10 张 sketchnote 图解由 Codex CLI 内置 imagegen 依据 `prompts/*.json` 生成，放在对应章节；总索引见[附录：图解索引](#附录图解索引)。重新生成：`bash generate_codex.sh [页号...]`。
+>
+> 相关文档：[工业界生产系统综述中的 Tectonic 小节](../industry-production-systems.md#1-facebooks-tectonic-filesystem-fast-2021)、[元数据扩展性综述](../metadata-scalability.md)、[论文清单](../essential-papers-2000-2026.md)。
 
 ## 目录
 
@@ -26,10 +28,15 @@
 - [11. 妥协与经验教训](#11-妥协与经验教训)
 - [12. 与相关系统的对比](#12-与相关系统的对比)
 - [13. 整体总结](#13-整体总结)
+- [附录：图解索引](#附录图解索引)
 
 ---
 
 ## 0. 一页速览
+
+![图解：封面](00-cover.png)
+
+> **图解**：从 Haystack、f4 和数十个 HDFS 集群组成的"存储星座"，合并为一个 EB 级、多租户、一个集群即一个数据中心的 Tectonic。
 
 **一句话**：Tectonic 是 Facebook 的数据中心级（单集群 EB 级）多租户分布式文件系统。它用"扁平 chunk 存储 + 分层哈希分片的 KV 化元数据 + 胖客户端按请求定制"三件套，把 Blob 存储（Haystack、f4）和数仓（几十个 HDFS 集群）合并进同一套系统，性能与原来的专用系统相当甚至更好，资源利用率更高，运维也更简单。
 
@@ -104,6 +111,10 @@ xychart-beta
 
 ## 2. 总体架构
 
+![图解：整体架构](01-architecture.png)
+
+> **图解**：只有 Metadata Store 与 Chunk Store 有状态；Client Library 编排所有 RPC，一次读依次查 Name → File → Block 层，再直连存储节点读 chunk。
+
 ```mermaid
 flowchart TB
     App["应用（Newsfeed、Search、Ads、Presto、Spark …）"]
@@ -174,6 +185,10 @@ flowchart LR
 
 ## 3. Chunk Store：扁平的 EB 级数据层
 
+![图解：Chunk Store](02-chunk-store.png)
+
+> **图解**：文件 → Block → Chunk；每个 block 单独选择 RS(r,k) 或副本，chunk 分布到不同机架；右栏的 copyset 机制详见 §6.2。
+
 ### 3.1 两个设计属性（§3.2）
 
 1. **扁平（flat）**：chunk 数量随存储节点数线性增长，没有中间层级，可以一直扩到 EB 级。
@@ -217,6 +232,10 @@ flowchart LR
 ---
 
 ## 4. Metadata Store：分层 + 哈希分片的元数据
+
+![图解：分层元数据](03-metadata-layers.png)
+
+> **图解**：三层 schema 与分片键、展开存储（`(d1, foo)` 而非大列表）、范围分区（ADLS）与哈希分区（Tectonic）的热点对比。
 
 这是论文最核心的一节（§3.3）。
 
@@ -309,6 +328,10 @@ flowchart TB
 - **例外**是 block → chunk 映射：chunk 可能在磁盘间迁移，会使 Block 层缓存失效。读取时可以发现缓存已过期并触发刷新。
 
 ### 4.5 一致性保证与跨分片操作
+
+![图解：元数据一致性](04-consistency.png)
+
+> **图解**：rename 与覆盖式 create 的交错及单 shard 事务修复、单写者 write token、跨目录 move 两步走。
 
 Tectonic 依赖 KV 的强一致操作和**分片内原子 read-modify-write 事务**，保证以下操作的 read-after-write 一致性：
 
@@ -415,6 +438,8 @@ sequenceDiagram
 
 ### 6.2 Copyset
 
+> 图解见 [§3 Chunk Store 图](#3-chunk-store扁平的-eb-级数据层)右栏（磁盘洗牌与 copyset 数量的权衡）。
+
 **Copyset**（Cidon 等，ATC 2013）指共同存放同一个 block 冗余数据的一组磁盘，例如一个 RS(10,4) block 的 copyset 是 14 块盘。
 
 - copyset 太多：磁盘故障突增时，更可能有某个 copyset 失去足够多的盘，导致数据不可用；
@@ -443,6 +468,10 @@ flowchart LR
 | Ephemeral | 存储 IOPS、元数据查询能力 | 需求时刻变化，分配可以实时调整，需要细粒度的实时自动管理 |
 
 ### 7.2 TrafficGroup 与 TrafficClass：降低基数
+
+![图解：多租户资源层级](05-multitenancy-hierarchy.png)
+
+> **图解**：容量硬配额，瞬时资源按约 50 个 TrafficGroup 分配；空闲资源按"本组 → 同租户 → 其他租户"、Gold > Silver > Bronze 借出。
 
 按租户管理太粗（一个租户里同时有用户在线流量和后台 GC 流量），按应用管理太细（数百个应用）。Tectonic 引入两个中间概念：
 
@@ -478,6 +507,10 @@ flowchart LR
 还有一条细节规则：一个 TrafficGroup 借用另一个 TrafficGroup 的资源时，这部分流量取**两者中较低的 TrafficClass**。这样各类流量的总体比例不会因借用而改变，节点也就能维持各 TrafficClass 的延迟目标。
 
 ### 7.3 全局与本地两级执行
+
+![图解：隔离的执行](06-enforcement.png)
+
+> **图解**：左：Client Library 限流器（分布式计数器 + 漏桶）；右：存储节点 WRR 调度与保护 Gold 小 IO 的三项措施。
 
 **全局（客户端侧）**：Client Library 内置限流器，基于**高性能、近实时的分布式计数器**，统计每个租户、每个 TrafficGroup 在最近一个短时间窗内的需求，实现一个**改进版漏桶算法**。请求先增加计数，再按上图顺序查找余量，找不到就延迟或拒绝。限流放在客户端，可以在请求可能被浪费**之前**就施加背压。
 
@@ -522,6 +555,10 @@ flowchart LR
 
 ### 8.1 数仓：整 block RS 编码 + 异步写（§5.1）
 
+![图解：数仓写路径](07-warehouse-writes.png)
+
+> **图解**：整块缓冲 → 内存中 RS(9,6) 编码 → 向 19 个节点发预留请求、写给最先响应的 15 个 → 14/15 确认，第 15 个离线修复（覆盖 §8.1、§8.2）。
+
 数仓的典型模式是写一次、读多次：文件在创建者 close 之前对读者不可见，此后终生不变。由于没有中途读，应用关心的是**整个文件的写入时间**，而不是单次 append 的延迟。
 
 - **整 block RS 编码写**：应用把数据缓冲到 block 大小，在内存里做 RS 编码，把各 chunk 直接写到存储节点。与副本相比，写入数据总量少，节省**空间、网络带宽和磁盘 IO**。RS(9,6) 虽然要写 15 块盘、IOPS 更多，但每次写都不大，而且 block 足够大，整 block 写的瓶颈在磁盘带宽而不在 IOPS；
@@ -547,6 +584,10 @@ sequenceDiagram
 效果：在吞吐利用率约 80% 的测试集群上，72 MB 整 block 写的 **p99 延迟降低约 20%**（论文图 3a）；负载越高，hedging 越有效。
 
 ### 8.3 Blob 存储：一致的 partial-block quorum append（§5.2）
+
+![图解：Blob 写路径](08-blob-writes.png)
+
+> **图解**：日志结构文件打包 blob → 3 副本 quorum append（先提交块大小 S 再 ACK）→ seal 后一次大 IO 转码为 RS(10,4)（覆盖 §8.3、§8.4）。
 
 Facebook 存有**几十万亿个 Blob**。Blob 存储（它本身也是 Tectonic 的租户）把很多 Blob 追加到日志结构文件里，用"blob ID → 文件内位置"的映射来定位，以此控制元数据量。Blob 远小于 Tectonic 的 block，又处在用户请求路径上，所以：
 
@@ -614,6 +655,10 @@ stateDiagram-v2
 **解读**：由表 2 粗略推算，每个存储节点约 1590 PB / 4208 ≈ 0.38 PB 容量（36 块盘，单盘约 10 TB 量级）；平均每个文件约 1250 PB / 107 亿 ≈ 117 MB，每个 block 约 1250 PB / 150 亿 ≈ 83 MB，与数仓 72 MB 整 block 写的量级吻合。（推算值，仅用于建立量级直觉，论文未直接给出。）
 
 ### 9.2 整合的收益：共享磁盘时间（§6.2，表 3）
+
+![图解：关键结果](09-results.png)
+
+> **图解**：按磁盘时间归一化：数仓峰值需求 0.57 超过自身供给 0.51，借用 Blob 的闲置（需求 0.12 / 供给 0.49）；不合并需多备约 17% 磁盘。
 
 - 数仓负载有大而规律的尖峰（由超大作业触发），Blob 负载平滑、可预测；
 - Blob 请求小，受 IOPS 限制；数仓请求大，受带宽限制。IOPS 和带宽都无法公平地衡量两者的用量，因此用**磁盘时间**（disk time，即磁盘忙的时间比例）作为统一的瓶颈资源度量。例如一块盘 1 秒内做 10 次 IO，每次 50 ms，就忙了 500/1000 ms；
@@ -733,7 +778,7 @@ flowchart LR
 | HDFS Federation / WAS | 多个单 NameNode namespace 共享存储节点 | 仍有数据集装箱问题；跨实例迁移需要重量级拷贝 | Tectonic 无装箱问题 |
 | Ceph / FDS | 对象 ID 哈希定位，无中心元数据 | 集群越大故障越频繁，哈希到位置的映射更新要传播到所有节点；扩容和下线时缺少可控迁移 | Tectonic **显式记录** chunk → 节点映射，可以控制迁移 |
 | ADLS / HopsFS | 元数据分层，存于分片存储 | 相关目录放在同一分片，存在子树热点；ADLS 的 block 存储用 WAS 联邦架构 | Tectonic 目录**哈希分片**，block 存储是**扁平**的 |
-| Colossus | 元数据存于 Spanner（全局一致数据库），客户端直连（论文原文如此；Google 官方博客称 Colossus 文件系统元数据存在 BigTable，Spanner 存的是上层存储服务的元数据，见 [Colossus 精读 §11.1](colossus-blog2021.md#111-元数据存在-bigtable-还是-spanner)） | 集群级多 EB | Tectonic 底座只有分片内强一致，论文称"在实践中不是问题" |
+| Colossus | 元数据存于 Spanner（全局一致数据库），客户端直连（论文原文如此；Google 官方博客称 Colossus 文件系统元数据存在 BigTable，Spanner 存的是上层存储服务的元数据，见 [Colossus 精读 §11.1](../colossus-blog2021.md#111-元数据存在-bigtable-还是-spanner)） | 集群级多 EB | Tectonic 底座只有分片内强一致，论文称"在实践中不是问题" |
 | Blob / 对象存储 | 没有层级目录树 | 更容易扩展 | 数仓负载需要层级 namespace |
 | Lustre / GPFS | 元数据节点数量有限 / 完整 POSIX | 为高吞吐并行访问调优 | Lustre 元数据扩展性受限；GPFS 的 POSIX 元数据开销在此场景下没必要 |
 
@@ -795,13 +840,13 @@ mindmap
 2. **元数据：先分层，再选分片方式**。哈希分片均衡、简单，适合"大量相近目录 + 批量作业"的数仓负载；范围分片保留局部性，适合需要子树操作（递归 list、du、快照、配额）的负载。这是取舍，没有对错，应该在设计文档里明确写出来。InfiniFS、CFS、Mantle 等后续工作都在试图兼得两者。
 3. **用不可变性换缓存和简单**：append-only、单写者、seal。这三个约束组合起来，让"无跨分片事务"的元数据底座也能提供足够的一致性，同时让客户端和元数据节点可以放心缓存。
 4. **在 KV 事务边界之内收尾**：多步跨分片操作的最后一步放进单分片事务，并校验前置状态；中间态的不一致交给后台 GC 清理。这是"没有分布式事务也能写出正确元数据操作"的一个实用范式。
-5. **数据面保持"无语义"**，把策略放到客户端或上层，以支持按请求定制。但要预留代理路径，应对远程访问、云原生或瘦客户端场景（参见 [Fisc](industry-production-systems.md) 对胖客户端的反思）。
+5. **数据面保持"无语义"**，把策略放到客户端或上层，以支持按请求定制。但要预留代理路径，应对远程访问、云原生或瘦客户端场景（参见 [Fisc](../industry-production-systems.md) 对胖客户端的反思）。
 6. **故障放大要有闸门**：重建读设上限、预留后再发数据的 hedging、TrafficClass 借用时降级，都是防止局部问题演变成全局雪崩的机制，值得放进新系统的默认配置。
 7. **端到端 checksum，覆盖到进程内的变换**。在这个规模下内存损坏是常态，不能只在网络和磁盘边界做校验。
 
 ### 13.5 与本仓库所调研系统的对照
 
-| 设计点 | Tectonic | [CephFS](../project/cephfs/README.md) | [3FS](../project/3fs/README.md) | [JuiceFS](../project/juicefs/README.md) | HDFS |
+| 设计点 | Tectonic | [CephFS](../../project/cephfs/README.md) | [3FS](../../project/3fs/README.md) | [JuiceFS](../../project/juicefs/README.md) | HDFS |
 |--------|----------|--------|-----|---------|------|
 | 元数据存储 | ZippyDB（分片 KV + Paxos） | MDS 集群 + RADOS 中的 journal / omap | FoundationDB（事务 KV） | 外置 Redis / TiKV / SQL 等 | NameNode 内存 + editlog |
 | 元数据分区 | 三层，各按 ID 哈希 | 动态子树分区（保留局部性） | 按 inode / 目录项 key 落在 FDB | 取决于所选引擎 | 不分区（单点，或联邦） |
@@ -815,9 +860,30 @@ mindmap
 
 ---
 
+## 附录：图解索引
+
+| # | 图 | 所在章节 |
+|---|----|----------|
+| 00 | [封面](00-cover.png) | 0. 一页速览 |
+| 01 | [整体架构](01-architecture.png) | 2. 总体架构 |
+| 02 | [Chunk Store](02-chunk-store.png) | 3. Chunk Store：扁平的 EB 级数据层 |
+| 03 | [分层元数据](03-metadata-layers.png) | 4. Metadata Store：分层 + 哈希分片的元数据 |
+| 04 | [元数据一致性](04-consistency.png) | 4.5 一致性保证与跨分片操作 |
+| 05 | [多租户资源层级](05-multitenancy-hierarchy.png) | 7.2 TrafficGroup 与 TrafficClass：降低基数 |
+| 06 | [隔离的执行](06-enforcement.png) | 7.3 全局与本地两级执行 |
+| 07 | [数仓写路径](07-warehouse-writes.png) | 8.1 数仓：整 block RS 编码 + 异步写（§5.1） |
+| 08 | [Blob 写路径](08-blob-writes.png) | 8.3 Blob 存储：一致的 partial-block quorum append（§5.2） |
+| 09 | [关键结果](09-results.png) | 9.2 整合的收益：共享磁盘时间（§6.2，表 3） |
+
+- 风格：sketchnote · 中文 · 16:9；作图规格见 `prompts/*.json`（每页的布局、必须标签、禁止项）。
+- 生成：`bash generate_codex.sh [页号...]`（Codex CLI imagegen，无需额外 token）；备选 `bash generate.sh`（Giiisp，需 `GIIISP_AUTH_TOKEN`）。
+- 已知小瑕疵：02 图 RS(10,4) 下只画了 7 台服务器；06 图图例中 Gold 为绿色、队列中为黄色；08 图"约省 53%"为模型自行换算（3× → 1.4×），非论文原文；09 图右下要点有一处重复。
+
+---
+
 ## 参考
 
 - 论文原文：S. Pan et al. *Facebook's Tectonic Filesystem: Efficiency from Exascale*. FAST 2021. <https://www.usenix.org/system/files/fast21-pan.pdf>
-- 前序系统：Haystack（OSDI 2010）、f4（OSDI 2014），见[论文清单](essential-papers-2000-2026.md)核心必读 #4、#6
+- 前序系统：Haystack（OSDI 2010）、f4（OSDI 2014），见[论文清单](../essential-papers-2000-2026.md)核心必读 #4、#6
 - 对比系统：ADLS（SIGMOD 2017）、HopsFS（FAST 2017）、Copysets（ATC 2013）、CacheLib（OSDI 2020）
-- 后续工作：Tectonic-Shift（ATC 2023），见[工业界生产系统](industry-production-systems.md#2-tectonic-shift-atc-2023)
+- 后续工作：Tectonic-Shift（ATC 2023），见[工业界生产系统](../industry-production-systems.md#2-tectonic-shift-atc-2023)

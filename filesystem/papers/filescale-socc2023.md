@@ -14,7 +14,7 @@
 > - [元数据扩展性综述 §2.6](metadata-scalability.md#26-filescale-fast-and-elastic-metadata-management-for-distributed-file-systemssocc-2023)：本文的简述版。
 > - [λFS（ASPLOS '23）精读](lambdafs-asplos2023.md)：同年、同样以 HopsFS 为主要对手、同样在数据库之上加一层缓存；λFS 用 serverless 函数做弹性读缓存，FileScale 用分区独占的写回缓存。
 > - [CFS（EuroSys 2023）精读](cfs-eurosys2023.md)：同样批评 HopsFS 的效率，但走"去代理层 + 裁剪临界区"的路线。
-> - [Tectonic（FAST 2021）精读](tectonic-fast2021.md)：FileScale 在相关工作中点名"不支持跨分区 move"的对象。
+> - [Tectonic（FAST 2021）精读](tectonic-fast2021/README.md)：FileScale 在相关工作中点名"不支持跨分区 move"的对象。
 
 ## 目录
 
@@ -608,7 +608,7 @@ FileScale 用**广度优先搜索**找出缓存层中相关的脏 inode，批量
 - **工业系统**：Tectonic 用 ZippyDB，只有单分片强一致、没有跨分片事务，所以不能跨分区 move 目录；ADLS 用 Paxos 维护复制的 Hekaton 表和索引，与 HopsFS 一样是为超大规模设计的，无法高效缩到单节点；Colossus 用 BigTable，不支持分布式事务；WinFS 把文件系统数据放进 DBMS，目的是增强搜索能力，而不是扩展性。
 - **联邦**：Giga+ 把每个目录分成多个分区分布到服务器上（与 FileScale 的代理层类似），但要自己实现跨分区原子事务和高可用，FileScale 则直接从数据库层获得；ViewFs 用客户端挂载点，每次增改挂载点都要修改客户端配置，很难不影响生产；HDFS RBF 和字节跳动 NNProxy 用路由器转发，但都不支持跨分区原子请求。
 
-**解读**：表 2 把 Tectonic 归为"不支持跨分区操作"略显简化。[Tectonic](tectonic-fast2021.md#45-一致性保证与跨分片操作) 能做跨目录 move，只是**不是原子的**：先在新父目录建链接、再删旧链接，用 backpointer 防止并发 move，最后一步放在单分片事务里校验，中间态交给 GC 清理。
+**解读**：表 2 把 Tectonic 归为"不支持跨分区操作"略显简化。[Tectonic](tectonic-fast2021/README.md#45-一致性保证与跨分片操作) 能做跨目录 move，只是**不是原子的**：先在新父目录建链接、再删旧链接，用 backpointer 防止并发 move，最后一步放在单分片事务里校验，中间态交给 GC 清理。
 
 ---
 
@@ -637,7 +637,7 @@ FileScale 用**广度优先搜索**找出缓存层中相关的脏 inode，批量
 | [λFS](lambdafs-asplos2023.md)（ASPLOS '23） | 按父目录哈希的 serverless 读缓存，同一分区可有多个实例 | 读命中时无；写同步提交 NDB | NDB 事务 + INV/ACK 缓存失效 | FaaS 自动扩缩实例 |
 | [CFS](cfs-eurosys2023.md)（EuroSys 2023） | 去掉代理层，客户端直接访问 TafDB | 每次都访问 TafDB，但多为单分片原语 | 独立 Renamer + 单分片原语 | 依赖底层 KV |
 | [InfiniFS](infinifs-fast2022.md)（FAST 2022） | 有状态 MDS（访问 / 内容元数据分离） | 本地 KV | 2PC | 静态 |
-| [Tectonic](tectonic-fast2021.md)（FAST 2021） | 无状态元数据服务 | 每次访问 ZippyDB | 非原子，多步 + backpointer + GC | 改路由 |
+| [Tectonic](tectonic-fast2021/README.md)（FAST 2021） | 无状态元数据服务 | 每次访问 ZippyDB | 非原子，多步 + backpointer + GC | 改路由 |
 | [SingularFS](singularfs-atc2023.md)（ATC 2023） | 单台元数据服务器 | 本地 PM | 不需要 | 无 |
 
 **解读**：
@@ -729,10 +729,10 @@ flowchart TB
 - Alexander Thomson, Daniel J. Abadi. *CalvinFS: Consistent WAN Replication and Scalable Metadata Management for Distributed File Systems*. USENIX FAST 2015.
 - Alexander Thomson et al. *Calvin: Fast Distributed Transactions for Partitioned Database Systems*. ACM SIGMOD 2012.
 - Raghu Ramakrishnan et al. *Azure Data Lake Store: A Hyperscale Distributed File Service for Big Data Analytics*. ACM SIGMOD 2017.
-- Satadru Pan et al. *Facebook's Tectonic Filesystem: Efficiency from Exascale*. USENIX FAST 2021.（本仓库精读：[tectonic-fast2021.md](tectonic-fast2021.md)）
+- Satadru Pan et al. *Facebook's Tectonic Filesystem: Efficiency from Exascale*. USENIX FAST 2021.（本仓库精读：[tectonic-fast2021/README.md](tectonic-fast2021/README.md)）
 - Kai Ren et al. *IndexFS: Scaling File System Metadata Performance with Stateless Caching and Bulk Insertion*. SC 2014.
 - Swapnil Patil, Garth Gibson. *Scale and Concurrency of GIGA+: File System Directories with Millions of Files*. USENIX FAST 2011.
 - Pulkit A. Misra et al. *Scaling Distributed File Systems in Resource-Harvesting Datacenters*. USENIX ATC 2017.（HDFS Router-based Federation 的来源之一）
 - Apache Hadoop. *HDFS Router-based Federation*；*HDFS ViewFs Guide*；*NNThroughputBenchmark*.
 - VoltDB <https://www.voltdb.com>；Apache Ignite <https://ignite.apache.org>
-- 本仓库相关：[元数据扩展性综述](metadata-scalability.md)、[λFS 精读](lambdafs-asplos2023.md)、[CFS 精读](cfs-eurosys2023.md)、[InfiniFS 精读](infinifs-fast2022.md)、[Tectonic 精读](tectonic-fast2021.md)、[SingularFS 精读](singularfs-atc2023.md)
+- 本仓库相关：[元数据扩展性综述](metadata-scalability.md)、[λFS 精读](lambdafs-asplos2023.md)、[CFS 精读](cfs-eurosys2023.md)、[InfiniFS 精读](infinifs-fast2022.md)、[Tectonic 精读](tectonic-fast2021/README.md)、[SingularFS 精读](singularfs-atc2023.md)
