@@ -57,8 +57,8 @@ POSIX 语义要求逐级检查路径上每一级目录的存在性与权限。�
 粗略可分为四条并行路线：
 
 1. **"下沉到事务存储"路线**（Tectonic 2021 → λFS 2023 → FileScale 2023，工业上还有 3FS/FoundationDB）：把持久化、跨分区事务、复制交给成熟的分片 KV / 分布式数据库；元数据服务要么无状态（Tectonic、3FS），要么只持有可丢弃或可重放的缓存（λFS 的读缓存、FileScale 的前缀独占写回缓存）。工程确定性最高，天花板取决于底层数据库。
-2. **"精细解耦 + 裁剪临界区"路线**（InfiniFS 2022 → CFS 2023 → Mantle 2025 → HMFS 2025）：不依赖通用分布式事务，通过元数据拆分、布局聚合、集中式轻量索引，把常见操作压成单分片/单 RPC。学术性能最强，复杂度也最高。
-3. **"新硬件纵向扩展"路线**（SingularFS 2023 → MesaFS 2026，含 HMFS 的 PM 部分）：用 PM/RDMA/NVMe 把单机 MDS 推到十亿级，回避分布式问题；关注点从"怎么分"转为"单机引擎的每操作 I/O 次数"。
+2. **"精细解耦 + 裁剪临界区"路线**（InfiniFS 2022 → CFS 2023 → Mantle 2025）：不依赖通用分布式事务，通过元数据拆分、布局聚合、集中式轻量索引，把常见操作压成单分片/单 RPC。学术性能最强，复杂度也最高。
+3. **"新硬件纵向扩展"路线**（SingularFS 2023 → HMFS 2025 → MesaFS 2026）：用 PM/RDMA/NVMe 把单机 MDS 推到十亿级，回避分布式问题；关注点从"怎么分"转为"单机引擎的每操作 I/O 次数"。
 4. **"负载特化与网内协同"路线**（FalconFS 2026、SwitchFS 2026、Fletch）：针对 AI 训练等特定负载重排职责（服务端解析、异步目录更新），或借助可编程交换机做协调/缓存。
 
 ---
@@ -181,16 +181,17 @@ POSIX 语义要求逐级检查路径上每一级目录的存在性与权限。�
 
 ### 2.8 HMFS: Accelerating Distributed Filesystem Metadata Service via Decoupling Directory Semantics from Metadata Indexing（SoCC 2025）
 
-- **作者/机构**：Wenhao Lv、Hao Guo、Qing Wang、Youyou Lu、Jiwu Shu，清华大学
-- **会议/年份**：ACM SoCC 2025
+- **作者/机构**：Wenhao Lv、Hao Guo、Qing Wang、Youyou Lu、Jiwu Shu（通讯作者），清华大学
+- **会议/年份**：ACM SoCC 2025（论文集第 334–347 页）
 - **链接**：https://dl.acm.org/doi/10.1145/3772052.3772237
-- **解决的问题**：现有元数据服务普遍依赖**有序索引**（如 LSM/B+ 树按 key 排序以支持 readdir 范围扫描），在高速网络 + persistent memory 时代，维护有序性的开销成为性能上限。
+- **解决的问题**：现有元数据服务普遍依赖**有序索引**（如 LSM/B+ 树按 key 排序以支持 readdir 范围扫描），在高速网络 + persistent memory 时代，维护有序性的开销成为性能上限：有序 KV 占 InfiniFS（Pmem-RocksDB）、SingularFS（P-Masstree）create 延迟的 76%、53%，而生产负载中点操作占 95.3%、readdir 只占约 4.7%。
 - **核心设计**：
-  - **index-decoupled metadata organization**：用**无序索引**（hash）存元数据对象，目录语义（readdir 的遍历顺序）改由对象间的**直接链接（inter-object links）**维护——即目录项之间自组织成链，而不靠索引排序。
-  - **lightweight crash-consistent updates**：两套独立结构（索引 + 链接）的一致更新协议，轻量崩溃一致。
-  - **parallel directory listing**：沿链接并行遍历，加速大目录 readdir。
-- **关键实验结果**：显著超越基于有序索引的元数据服务（具体倍数待确认，需查论文正文）。
-- **局限性**：链接结构使范围/前缀查询之外的语义（如按序分页 readdir）需要额外设计；PM 依赖同 SingularFS。
+  - **index-decoupled metadata organization**：每台服务器用 PM 哈希表（DASH）索引元数据，O(1) 点查；目录内容元数据的 child_ptr 指向子项链表，子项的 sibling_ptr 指向兄弟，链表即目录；分区沿用 InfiniFS 的按目录方案（访问/内容元数据分离），一个目录的子项都在同一台服务器上。
+  - **lightweight crash-consistent updates**：利用"ctime ≥ mtime"与 16 字节原子写，单点操作一次原子写，create/delete 三步有序原子写（以 16 字节 CAS 更新父目录 child_ptr + mtime 为提交点），崩溃后按状态位与时间戳按需恢复；rename/link 用日志 + 2PC。
+  - **parallel directory listing**：预取流水线、链表两段并行、DRAM 缓存、LZ4 压缩，100 万文件目录 42 ms。
+- **关键实验结果**：单台元数据服务器 stat 吞吐是 CephFS/InfiniFS/SingularFS 的 20.5×/7.5×/1.8×，延迟低 92%/62%/39%；create 对 SingularFS 只快 12%；4 台服务器、120 亿文件时 create 13.4 Mops/s、stat 34.7 Mops/s；崩溃后 65.7 ms 恢复服务。
+- **局限性**：依赖字节可寻址持久介质（Optane 已停产，CXL 内存语义 SSD / UPS-DRAM 未实测）；readdir 不保证顺序（POSIX 允许），按序分页需额外设计；共享目录 create/delete 约在 1.2/2.3 Mops/s 饱和；跨目录 rename 留下间接对象，元数据永久留在原服务器。
+- **逐节精读**：[hmfs-socc2025.md](hmfs-socc2025.md)
 - **设计启示**：元数据存储引擎选型不必默认 RocksDB/LSM："readdir 需要有序性"这一假设可以被打破——hash 索引 + 目录内链表（或分桶）既降低写放大又保留遍历能力。若使用 RocksDB，至少应把"目录扫描"与"点查"分开建模，避免为点查负载支付排序成本。
 
 ### 2.9 FalconFS: Distributed File System for Large-Scale Deep Learning Pipeline（NSDI 2026）
@@ -261,7 +262,7 @@ POSIX 语义要求逐级检查路径上每一级目录的存在性与权限。�
 | λFS (ASPLOS'23) | 按父目录一致性 hash 到固定 deployment + 函数内缓存 | 函数内缓存解析，未命中查 DB | NDB 事务 + INV/ACK 缓存失效 | MySQL NDB Cluster | 弹性伸缩；读吞吐 8–31× HopsFS，写更慢 |
 | FileScale (SoCC'23) | 三层：挂载表前缀路由 + 前缀独占写回缓存 + DDBMS | 缓存内按各级前缀并行哈希查找 | 单分区本地串行；跨分区刷脏后交 DDBMS 事务 | VoltDB / Apache Ignite | 小规模≈单机 HDFS；线性扩展 |
 | Mantle (SOSP'25) | TafDB 分片（全量）+ 每 namespace 单机 IndexNode（目录骨架） | IndexNode 单 RPC lookup | 环检测 offload 至 IndexNode；delta 更新 | TafDB | 100 亿对象/namespace；1.89M lookup/s；生产 1.5–2 年 |
-| HMFS (SoCC'25) | 无序（hash）索引 + 对象间链接维护目录语义 | hash 点查 | 待确认 | PM 上无序索引 + 链接结构 | 显著超有序索引方案（数字待确认） |
+| HMFS (SoCC'25) | 按目录分区（同 InfiniFS）；PM 哈希索引 + 目录内链表 | 客户端缓存 + hash 点查 | 8/16 字节原子写 + 有序写，按需恢复；rename 日志 + 2PC | PM 哈希表（DASH） | stat 为 SingularFS 1.8×；120 亿文件 13.4/34.7 Mops/s |
 | FalconFS (NSDI'26) | 文件按名 hash 分区；目录 namespace 惰性全复制 | 服务端本地解析（stateless client） | 协调者 2PL + 2PC，广播失效 dentry 副本 | 定制 PostgreSQL（每 MNode） | 万卡 NPU 生产 1 年；训练吞吐至 12.81× |
 | MesaFS (EuroSys'26) | 单引擎层工作（不改分区） | — | —（不变式感知恢复） | SSD 半有序布局，单次写更新 | 62–95.1% 裸 SSD 性能 |
 | SwitchFS (EuroSys'26) | 常规分区 + 交换机跟踪目录状态 | 常规 | 异步 delta，读时合并 | —（协调面创新） | 争用下延迟/吞吐显著改善（待确认） |

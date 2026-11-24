@@ -50,6 +50,7 @@
 - [λFS（ASPLOS '23）](lambdafs-asplos2023.md)：GMU、爱荷华州立与弗吉尼亚大学把 HopsFS 的 NameNode 改写成 serverless 函数，构建弹性元数据缓存层。覆盖 HopsFS 无状态 NameNode 与静态规模的两个问题、HTTP-TCP 混合 RPC 与连接共享、按父目录哈希的固定 deployment 分区与 trie 缓存、随机 HTTP 替换的敏捷扩缩容模型与防抖动/落后者缓解、INV/ACK 一致性协议与子树前缀失效和卸载、Spotify 突发负载与成本评估（含 Pareto 基准的期望值推导）、λIndexFS 移植，以及多处百分比分母错误与摘要数字无出处等问题。
 - [FileScale（SoCC 2023）](filescale-socc2023.md)：UMD（Abadi 组）在 HDFS 内实现的三层元数据架构。覆盖单机内存/联邦/DDBMS 三条路线的缺口、ZooKeeper 挂载表的 proxy 与 watch 两种路由和过期路由转发、前缀独占的写回缓存与远程 WAL、以完整路径为主键的 14 表关系模式（含表 1 的 pid 错误）、跨分区请求的刷脏—逐出—DDBMS 事务流程、单节点与 32 NameNode 扩展评估、1% 跨分区事务的吞吐断崖、VoltDB 与 Ignite 对比，以及与 λFS 读缓存路线的对照。
 - [Mantle（SOSP 2025）](mantle-sosp2025.md)：中科大与百度为云对象存储（百度 BOS）设计的层级元数据服务。覆盖对象存储无状态代理的约束、表式元数据的逐级 RPC 解析与共享目录 2PC 竞争（生产命名空间平均深度约 11 层）、TafDB + 每命名空间 IndexNode 的包含式两层架构（约 80 B/目录）、TopDirPathCache 与无锁 Invalidator、follower/learner 读、delta 记录、IndexNode 上的单 RPC 加锁防环、各项优化消融与生产命名空间数据，以及与 CFS、FalconFS 的对照和多处数字不一致。
+- [HMFS（SoCC 2025）](hmfs-socc2025.md)：清华存储组在 RDMA + PM 上的分布式元数据服务，InfiniFS、SingularFS 的后续。覆盖点/范围操作的生产比例（点操作 95.3%）、有序 KV 在 PM 上的瓶颈实测、PM 哈希表 + 目录内链表的索引解耦组织与 64 字节统一布局、基于"ctime ≥ mtime"与 16 字节原子写的无日志更新和按需恢复、流水线/两段并行/缓存/LZ4 的目录遍历、定长每 CPU 分配器、间接对象实现的 rename 与硬链接、单机与 120 亿文件扩展评估，以及 4 台服务器 create/stat 数字写反等不一致。
 
 ## 3. 跨文档重叠说明
 
@@ -64,6 +65,7 @@
 | λFS (ASPLOS '23) | 元数据扩展性 | 精读文档 lambdafs-asplos2023.md；与 CFS 精读对照（同以 HopsFS 为基线） |
 | FileScale (SoCC 2023) | 元数据扩展性 | 精读文档 filescale-socc2023.md；与 λFS 精读对照（读缓存 vs 写回缓存） |
 | Mantle (SOSP 2025) | 元数据扩展性 | 精读文档 mantle-sosp2025.md；与 CFS（同团队、同底座 TafDB）、FalconFS（服务端解析）精读对照 |
+| HMFS (SoCC 2025) | 元数据扩展性 | 精读文档 hmfs-socc2025.md；与 InfiniFS、SingularFS（同组前作、主要基线）精读对照 |
 | Colossus (2021 博客 + 2025 续篇) | 工业界生产系统 | 精读文档 colossus-blog2021.md |
 | CacheSack (ATC 2022) | 工业界生产系统 | 精读文档 cachesack-atc2022.md；Colossus 精读（L4 缓存） |
 | EBS Glory (FAST 2024) | 客户端与通用技术 | 精读文档 ebs-fast2024.md；工业界生产系统（简述） |

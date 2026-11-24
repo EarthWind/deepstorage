@@ -691,7 +691,7 @@ quadrantChart
 | [Tectonic（FAST 2021）](tectonic-fast2021.md) | 同为"一个数据中心一个文件系统"的动机；Tectonic 按层（Name / File / Block）和 ID 哈希分片，路径解析逐级串行，不提供跨目录原子 rename。InfiniFS 的 Baseline 即类似这种按目录粒度分区的设计 |
 | CFS（EuroSys 2023，百度） | 后继工作：在类似的元数据拆分基础上，用"裁剪临界区"让更多操作避免分布式事务，论文报告吞吐比 InfiniFS 高 1.22–4.10 倍（见 [元数据扩展性综述](metadata-scalability.md)） |
 | SingularFS（ATC 2023，清华） | 同一团队的另一条路线：单台元数据服务器 + PM + 精细并发控制，把"分布式协调"整个避开；访问/时间戳拆分与元数据分组沿用了 InfiniFS 的思路，只是分到 NUMA 节点而非服务器（精读：[singularfs-atc2023.md](singularfs-atc2023.md)） |
-| Mantle（SOSP 2025）、HMFS（SoCC 2025） | 延续"目录语义与元数据索引解耦"的路线，集中式轻量索引加速路径解析 |
+| Mantle（SOSP 2025）、HMFS（SoCC 2025） | Mantle 用集中式轻量索引（IndexNode）加速路径解析；HMFS 沿用本文的按目录分区，把存储引擎换成 PM 哈希表 + 目录内链表（见 [Mantle 精读](mantle-sosp2025.md)、[HMFS 精读](hmfs-socc2025.md)） |
 | FalconFS（NSDI 2026） | 面向 AI 负载，同样关注深路径解析和近根热点，采用无状态客户端 + 服务端路径解析的不同取舍（精读：[falconfs-nsdi2026.md](falconfs-nsdi2026.md)） |
 
 ---
