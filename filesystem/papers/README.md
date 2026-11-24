@@ -30,7 +30,7 @@
 
 单篇精读（基于论文原文逐节解读，含架构图、流程图与整体总结）：
 
-- [Tectonic（FAST 2021）](tectonic-fast2021.md)：Facebook EB 级多租户文件系统。覆盖三层哈希分片元数据、单写者与跨分片 move、TrafficGroup 多租户、数仓 hedged quorum 写与 Blob quorum append 转码、生产数据与经验教训。
+- [Tectonic（FAST 2021）](tectonic-fast2021/README.md)：Facebook EB 级多租户文件系统（含 10 张 sketchnote 图解）。覆盖三层哈希分片元数据、单写者与跨分片 move、TrafficGroup 多租户、数仓 hedged quorum 写与 Blob quorum append 转码、生产数据与经验教训。
 - [Tectonic-Shift（ATC 2023）](tectonic-shift-atc2023.md)：Meta 在 HDD Tectonic 前加透明 flash 读缓存 Shift 服务 ML 训练。覆盖功耗驱动的软硬件设计空间、DLRM 训练负载刻画、一致性哈希 + CacheLib 架构、基于作业规格的准入/重插入策略与 PID 写入限速、策略评估与生产 29% 功耗收益。
 - [InfiniFS（FAST 2022）](infinifs-fast2022.md)：清华等提出的数据中心级元数据服务。覆盖阿里云盘古负载刻画、访问-内容解耦分区、基于出生三元组哈希的推测式路径解析（含 rename-list/back-pointer）、乐观访问元数据缓存与惰性失效、孤儿环与事务、因素分析与千亿文件评估。
 - [SingularFS（ATC 2023）](singularfs-atc2023.md)：清华用单台元数据服务器（Optane PM + RDMA）支撑十亿级文件。覆盖单机路线的规模论证、基于 btime/dtime 时间戳不变式的无日志元数据操作、写者/更新者/读者三级并发控制（cmpxchg16b 无锁时间戳）、NUMA 间与 NUMA 内的混合 inode 分区、惰性崩溃恢复，以及与 InfiniFS、CFS 的对照。

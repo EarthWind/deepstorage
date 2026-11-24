@@ -10,7 +10,7 @@
 >
 > 注意区分：本文的 CFS 是**百度智能云文件存储 CFS**，不是京东的 ChubaoFS（SIGMOD 2019 论文也叫 "CFS"，现名 CubeFS）。
 >
-> 相关文档：[元数据扩展性综述中的 CFS 小节](metadata-scalability.md#23-cfs-scaling-metadata-service-for-distributed-file-system-via-pruned-scope-of-critical-sectionseurosys-2023)、[工业界生产系统中的 Baidu CFS 小节](industry-production-systems.md#5-baidu-cfseurosys-2023)、[InfiniFS（FAST 2022）精读](infinifs-fast2022.md)（CFS 的主要对比对象）、[Tectonic（FAST 2021）精读](tectonic-fast2021.md)、[λFS（ASPLOS '23）精读](lambdafs-asplos2023.md)（同以 HopsFS 为基线，方向正交：λFS 给代理层加弹性缓存，CFS 去掉代理层）。
+> 相关文档：[元数据扩展性综述中的 CFS 小节](metadata-scalability.md#23-cfs-scaling-metadata-service-for-distributed-file-system-via-pruned-scope-of-critical-sectionseurosys-2023)、[工业界生产系统中的 Baidu CFS 小节](industry-production-systems.md#5-baidu-cfseurosys-2023)、[InfiniFS（FAST 2022）精读](infinifs-fast2022.md)（CFS 的主要对比对象）、[Tectonic（FAST 2021）精读](tectonic-fast2021/README.md)、[λFS（ASPLOS '23）精读](lambdafs-asplos2023.md)（同以 HopsFS 为基线，方向正交：λFS 给代理层加弹性缓存，CFS 去掉代理层）。
 
 ## 目录
 
@@ -841,7 +841,7 @@ flowchart LR
 - Yiduo Wang et al. *CFS: Scaling Metadata Service for Distributed File System via Pruned Scope of Critical Sections*. ACM EuroSys 2023. <https://doi.org/10.1145/3552326.3587443>
 - Wenhao Lv et al. *InfiniFS: An Efficient Metadata Service for Large-Scale Distributed Filesystems*. USENIX FAST 2022. 本仓库精读：[infinifs-fast2022.md](infinifs-fast2022.md)
 - Salman Niazi et al. *HopsFS: Scaling Hierarchical File System Metadata Using NewSQL Databases*. USENIX FAST 2017.
-- Satadru Pan et al. *Facebook's Tectonic Filesystem: Efficiency from Exascale*. USENIX FAST 2021. 本仓库精读：[tectonic-fast2021.md](tectonic-fast2021.md)
+- Satadru Pan et al. *Facebook's Tectonic Filesystem: Efficiency from Exascale*. USENIX FAST 2021. 本仓库精读：[tectonic-fast2021/README.md](tectonic-fast2021/README.md)
 - Raghu Ramakrishnan et al. *Azure Data Lake Store: A Hyperscale Distributed File Service for Big Data Analytics*. SIGMOD 2017.
 - Cheng Li et al. *Making Geo-Replicated Systems Fast as Possible, Consistent when Necessary*. OSDI 2012.
 - Romain Vaillant et al. *CRDTs for Truly Concurrent File Systems*. HotStorage 2021.
