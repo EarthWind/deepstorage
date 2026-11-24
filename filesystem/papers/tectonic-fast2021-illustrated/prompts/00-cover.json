@@ -1,0 +1,26 @@
+{
+  "prompt": "【类型】封面概念图\n【主题】Tectonic：从\"专用系统星座\"到\"一个 EB 级文件系统\"\n【视觉结构】\n- 左侧 1/3：散落的多个小方块像星座，分别写 \"Haystack\"（热 blob，3副本）、\"f4\"（温 blob，RS编码）、多个 \"HDFS\" 小圆柱（数仓，数十个集群），之间用虚线相连，旁边小便签写\"资源被困住、运维复杂\"\n- 中间：一个粗大的手绘向右箭头，箭头上写\"合并\"\n- 右侧 2/3：一块巨大的地壳板块状平台，上面写大字 \"Tectonic\"，平台上站着两个租户图标：\"Blob 存储\"（照片/视频小图标）和\"数据仓库\"（表格/柱状图小图标），下方写\"EB 级 · 多租户 · 一个集群 = 一个数据中心\"\n- 底部一行三个小徽章：①\"可扩展：元数据分层 hash\"②\"可隔离：TrafficGroup\"③\"可定制：Client Library 按调用配置\"\n- 右下角小星标：\"数仓集群数 ↓10×\"\n【语言】中文（英文术语按原样保留，不要改写拼写）\n【必须出现的标签】Tectonic、Haystack、f4、HDFS、EB 级、多租户、一个集群 = 一个数据中心\n【风格】sketchnote 科研手抄报：明亮浅米白底(#FFF8EA)，黑色手绘线条，墨迹粗细变化；强调色只用深蓝/珊瑚红/橄榄绿/柔和黄色，清爽不过饱和；手绘感箭头；中文手写体但清晰可读；可少量放大镜、星号、便签、圈注等趣味符号，但服务理解；主体图解占画面75%-85%；右下角手写页码。\n【禁止】不要代码块、照片写实、3D渲染；不要旧羊皮纸、暗角、污渍、黄褐色复古调；不要大面积空白；不要随机英文或拼写变体；不要水印、广告风格、伪论文截图；不要图标题以外的长段正文。\n页码：1/10",
+  "negativePrompt": "水印，模糊文字，错乱标签，随机英文，拼写错误，旧羊皮纸，暗角，污渍，3D渲染，照片写实，大面积空白，广告风格",
+  "aspectRatio": "16:9",
+  "imageSize": "1K",
+  "caption": "Tectonic：一个 EB 级文件系统取代一堆专用存储",
+  "intent": "Facebook 把 Haystack、f4、几十个 HDFS 集群合并成一个数据中心级多租户文件系统 Tectonic",
+  "figure_spec": {
+    "figure_kind": "cover illustration",
+    "caption": "Tectonic：一个 EB 级文件系统取代一堆专用存储",
+    "communicative_intent": "Facebook 把 Haystack、f4、几十个 HDFS 集群合并成一个数据中心级多租户文件系统 Tectonic",
+    "required_labels": [
+      "Tectonic",
+      "Haystack",
+      "f4",
+      "HDFS",
+      "EB 级",
+      "多租户",
+      "一个集群 = 一个数据中心"
+    ],
+    "forbidden_labels": [],
+    "layout_brief": "横版 16:9，见 prompt 视觉结构",
+    "style_brief": "sketchnote 明亮科研手抄报，中文",
+    "source_context": "Pan et al., Facebook's Tectonic Filesystem: Efficiency from Exascale, FAST 2021"
+  }
+}

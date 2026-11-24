@@ -1,0 +1,28 @@
+{
+  "prompt": "【类型】时序 + 机制图（两栏）\n【主题】Tectonic 元数据一致性的三个关键技巧\n【视觉结构】\n- 左栏（占60%）\"rename 与 create 竞争\"：两条竖直时间线\n  左线 \"rename f1→f2\"：R1 \"读 f1 的 fid（Name, shard(d)）\" → R2 \"把 f2 加为 fid 的 owner（File）\" → R3 \"原子：建 f2→fid，删 f1→fid（Name, shard(d)）\"\n  右线 \"create 覆盖 f1\"：C1 \"新建 fid_new（File）\" → C2 \"f1→fid_new（Name, shard(d)）\"\n  C1、C2 插在 R1 和 R3 之间（用珊瑚红虚线标出插入点），R3 旁画闪电\"若直接执行会抹掉新文件！\"\n  修复用深蓝框：\"R3 在 shard 内事务里检查 f1 自 R1 以来未被修改，否则失败\"\n- 右上栏 \"单写者语义\"：文件图标上挂一把钥匙 \"写 token\"；写者 A 持旧 token，写者 B 打开文件生成新 token 覆盖 → A 的元数据写入被拒（红叉），B 封存 A 未完成的 block\n- 右下栏 \"保证范围\" 小清单：✓ 同目录内创建/删除/重命名强一致；✓ 读后写一致；✗ 跨目录移动非原子（两步：先在新父目录加链接，再删旧链接，用反向指针防并发移动）\n【语言】中文（英文术语按原样保留，不要改写拼写）\n【必须出现的标签】单 shard 事务、rename、create、R1、R3、C1、C2、写 token、单写者\n【风格】sketchnote 科研手抄报：明亮浅米白底(#FFF8EA)，黑色手绘线条，墨迹粗细变化；强调色只用深蓝/珊瑚红/橄榄绿/柔和黄色，清爽不过饱和；手绘感箭头；中文手写体但清晰可读；可少量放大镜、星号、便签、圈注等趣味符号，但服务理解；主体图解占画面75%-85%；右下角手写页码。\n【禁止】不要代码块、照片写实、3D渲染；不要旧羊皮纸、暗角、污渍、黄褐色复古调；不要大面积空白；不要随机英文或拼写变体；不要水印、广告风格、伪论文截图；不要图标题以外的长段正文。\n页码：5/10",
+  "negativePrompt": "水印，模糊文字，错乱标签，随机英文，拼写错误，旧羊皮纸，暗角，污渍，3D渲染，照片写实，大面积空白，广告风格",
+  "aspectRatio": "16:9",
+  "imageSize": "1K",
+  "caption": "没有跨 shard 事务时，怎么保证一致性",
+  "intent": "同目录操作在单 shard 内原子；rename 与 create 的竞争靠 shard 内事务检查；跨目录 move 非原子；单写者 token",
+  "figure_spec": {
+    "figure_kind": "mechanism schematic",
+    "caption": "没有跨 shard 事务时，怎么保证一致性",
+    "communicative_intent": "同目录操作在单 shard 内原子；rename 与 create 的竞争靠 shard 内事务检查；跨目录 move 非原子；单写者 token",
+    "required_labels": [
+      "单 shard 事务",
+      "rename",
+      "create",
+      "R1",
+      "R3",
+      "C1",
+      "C2",
+      "写 token",
+      "单写者"
+    ],
+    "forbidden_labels": [],
+    "layout_brief": "横版 16:9，见 prompt 视觉结构",
+    "style_brief": "sketchnote 明亮科研手抄报，中文",
+    "source_context": "Pan et al., Facebook's Tectonic Filesystem: Efficiency from Exascale, FAST 2021"
+  }
+}
