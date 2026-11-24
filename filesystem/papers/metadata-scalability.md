@@ -165,17 +165,18 @@ POSIX 语义要求逐级检查路径上每一级目录的存在性与权限。�
 
 ### 2.7 Mantle: Efficient Hierarchical Metadata Management for Cloud Object Storage Services（SOSP 2025）
 
-- **作者/机构**：Qiang Li（?）、Yiduo Wang、Cheng Li 等，中国科学技术大学 + 百度 + 清华大学等（完整名单待确认，以 DL 页为准）
-- **会议/年份**：ACM SOSP 2025
+- **作者/机构**：Jiahao Li、Biao Cao（共同一作）、Jielong Jian、Cheng Li、Sen Han、Yiduo Wang、Yufei Wu、Kang Chen 等共 19 人；中国科学技术大学、百度、清华大学、合肥综合性国家科学中心人工智能研究院；通讯作者 Cheng Li、Biao Cao
+- **会议/年份**：ACM SOSP 2025（论文集第 928–943 页）
 - **链接**：https://dl.acm.org/doi/10.1145/3731569.3764824 ；PDF: https://madsys.cs.tsinghua.edu.cn/publication/mantle-efficient-hierarchical-metadata-management-for-cloud-object-storage-services/SOSP25-Li.pdf
 - **解决的问题**：对象存储（BOS）上提供层级 namespace（供大数据/AI 以文件系统语义访问对象），要求单 namespace 百亿对象、高并发目录更新、跨目录 rename 防环。
 - **核心设计**：
-  - **两层架构**：共享的分片数据库 **TafDB**（保存完整元数据，可横向扩展）+ 每 namespace 一个单机 **IndexNode**（仅保存每目录约 80 字节的关键目录元数据，用于高效 lookup 与跨目录协调）。
-  - **路径解析**：IndexNode 内存中完成整条路径解析，实现**单 RPC lookup**。
-  - **热点/rename**：TafDB 中目录项采用 **out-of-place delta 更新**降低高争用目录的冲突；跨目录 rename 的**环检测 offload 到 IndexNode**（集中式防环，避免分布式协议）。
+  - **两层架构**：共享的分片数据库 **TafDB**（保存完整元数据，可横向扩展）+ 每 namespace 一组 Raft 复制的 **IndexNode**（仅保存每目录约 80 字节的访问元数据：pid、name、id、permission、lock 位，用于高效 lookup 与跨目录协调）。
+  - **路径解析**：IndexNode 内存中完成整条路径解析与权限检查，实现**单 RPC lookup**；TopDirPathCache 只缓存截去最后 k=3 层的路径前缀（内存约为全量缓存的 12%），无锁 Invalidator 处理失效，follower/learner 用 ReadIndex 分担读。
+  - **热点/rename**：TafDB 中父目录属性改为插入 **delta 记录**（pid, "/_ATTR", 事务时间戳），异步合并，仅在持续竞争时启用；跨目录 rename 在 IndexNode 上用 lock 位一次 RPC 加锁并本地防环，最终仍以 TafDB 与 IndexNode 之间的 2PC 提交；Raft 日志批量提交减少 fsync。
   - **存储引擎**：TafDB（与 CFS 同源的百度分布式表格系统）。
-- **关键实验结果**：单 namespace 支撑 **100 亿对象/目录**；lookup 达 **180 万 ops/s**；高争用下 5.8 万目录更新/s；相比 Tectonic/InfiniFS/LocoFS 的元数据服务，延迟降低 6.6%–99.1%，吞吐提升 0.07–115×；在百度 BOS 生产环境部署超过 2 年。
-- **局限性**：IndexNode 是每 namespace 的集中组件（容量与故障域受限，靠"只存 80B/目录"缓解）；两层间一致性维护复杂。
+- **关键实验结果**：单 namespace 支撑 **100 亿对象/目录**；lookup 最高 **1,894.5 Kop/s**（2 follower + 2 learner）；共享目录下 mkdir 58.8K、dirrename 38.0K ops/s；相比 Tectonic/InfiniFS/LocoFS（均为作者复现），延迟降低 6.6%–99.1%，加速 1.07–116×；Spark 分析作业完成时间缩短 63.3–93.3%；部署于百度 BOS（摘要称超过 2 年，引言称超过 1.5 年），3 个集群 19 个内部命名空间。
+- **局限性**：IndexNode 是每 namespace 的集中组件（容量受目录数限制，写入受单个 Raft 组限制，当前瓶颈在 CPU）；dirrename 仍需跨 TafDB 与 IndexNode 的 2PC；论文自己的实验显示，客户端可控时加客户端缓存的 InfiniFS 在纯 lookup 负载上可追平 Mantle。
+- **逐节精读**：[mantle-sosp2025.md](mantle-sosp2025.md)
 - **设计启示**："**大而全的分片存储 + 小而热的集中索引**"是极实用的混合架构：可让一个轻量 index 组件仅缓存目录骨架（id、parent、name、权限），承担路径解析与 rename 防环，元数据分片只处理平坦化的 inode/dentry 读写。目录骨架极小（百亿目录 ≈ 数百 GB，亿级目录 ≈ 数 GB），单机可承载。
 
 ### 2.8 HMFS: Accelerating Distributed Filesystem Metadata Service via Decoupling Directory Semantics from Metadata Indexing（SoCC 2025）
@@ -259,7 +260,7 @@ POSIX 语义要求逐级检查路径上每一级目录的存在性与权限。�
 | SingularFS (ATC'23) | 不分区（单 MDS，机内 hybrid inode partition：NUMA 间按目录组、NUMA 内按键哈希） | 逐级 lookup + 客户端目录元数据缓存 | 日志（2 个 inode）+ 严格 2PL，无分布式协调 | P-Masstree on Optane PM + RDMA | 每 NUMA 17.5 亿文件；单机 create 8.36M ops/s |
 | λFS (ASPLOS'23) | 按父目录一致性 hash 到固定 deployment + 函数内缓存 | 函数内缓存解析，未命中查 DB | NDB 事务 + INV/ACK 缓存失效 | MySQL NDB Cluster | 弹性伸缩；读吞吐 8–31× HopsFS，写更慢 |
 | FileScale (SoCC'23) | 三层：挂载表前缀路由 + 前缀独占写回缓存 + DDBMS | 缓存内按各级前缀并行哈希查找 | 单分区本地串行；跨分区刷脏后交 DDBMS 事务 | VoltDB / Apache Ignite | 小规模≈单机 HDFS；线性扩展 |
-| Mantle (SOSP'25) | TafDB 分片（全量）+ 每 namespace 单机 IndexNode（目录骨架） | IndexNode 单 RPC lookup | 环检测 offload 至 IndexNode；delta 更新 | TafDB | 100 亿对象/namespace；1.8M lookup/s；生产 2 年 |
+| Mantle (SOSP'25) | TafDB 分片（全量）+ 每 namespace 单机 IndexNode（目录骨架） | IndexNode 单 RPC lookup | 环检测 offload 至 IndexNode；delta 更新 | TafDB | 100 亿对象/namespace；1.89M lookup/s；生产 1.5–2 年 |
 | HMFS (SoCC'25) | 无序（hash）索引 + 对象间链接维护目录语义 | hash 点查 | 待确认 | PM 上无序索引 + 链接结构 | 显著超有序索引方案（数字待确认） |
 | FalconFS (NSDI'26) | 文件按名 hash 分区；目录 namespace 惰性全复制 | 服务端本地解析（stateless client） | 协调者 2PL + 2PC，广播失效 dentry 副本 | 定制 PostgreSQL（每 MNode） | 万卡 NPU 生产 1 年；训练吞吐至 12.81× |
 | MesaFS (EuroSys'26) | 单引擎层工作（不改分区） | — | —（不变式感知恢复） | SSD 半有序布局，单次写更新 | 62–95.1% 裸 SSD 性能 |
