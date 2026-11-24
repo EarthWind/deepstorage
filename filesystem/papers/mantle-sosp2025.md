@@ -13,7 +13,7 @@
 > 相关文档：
 > - [元数据扩展性综述 §2.7](metadata-scalability.md#27-mantle-efficient-hierarchical-metadata-management-for-cloud-object-storage-servicessosp-2025)：本文的简述版。
 > - [CFS（EuroSys 2023）精读](cfs-eurosys2023.md)：同一团队（中科大 + 百度）的前作，同样建在 TafDB 上；Mantle 认为 CFS 的单分片化策略解决不了 dirrename。
-> - [InfiniFS（FAST 2022）精读](infinifs-fast2022.md)：Mantle 的基线之一（并行路径解析）。
+> - [InfiniFS（FAST 2022）精读](infinifs-fast2022/deep-read.md)：Mantle 的基线之一（并行路径解析）。
 > - [FalconFS（NSDI 2026）精读](falconfs-nsdi2026.md)：几乎同期的"服务端路径解析"工作，把整棵目录树复制到所有元数据节点。
 > - [Tectonic（FAST 2021）精读](tectonic-fast2021/deep-read.md)：百度原有的"数据库表式"元数据服务与之类似，是 Mantle 的基线之一。
 
@@ -618,7 +618,7 @@ Analytics 以目录修改为主，缓存收益有限；Audio 中 InfiniFS 从 11
 |------|---------|---------|------------------|---------|---------|
 | **Mantle** | IndexNode 单 RPC，TopDirPathCache + follower 读 | TafDB delta 记录 | IndexNode 本地 lock 位 | 每命名空间一组 Raft | 客户端不可控的对象存储；目录少于约 10 亿 |
 | [CFS](cfs-eurosys2023.md) | 客户端逐级查 TafDB | 单分片原语 + delta apply | 独立 Renamer | Renamer | 客户端库可控的 POSIX 文件系统 |
-| [InfiniFS](infinifs-fast2022.md) | 客户端缓存 + 投机并行解析 | 本地事务 + 2PC | rename 协调者 | rename 协调者 | 客户端可控，低并发时并行解析有效 |
+| [InfiniFS](infinifs-fast2022/deep-read.md) | 客户端缓存 + 投机并行解析 | 本地事务 + 2PC | rename 协调者 | rename 协调者 | 客户端可控，低并发时并行解析有效 |
 | [FalconFS](falconfs-nsdi2026.md) | 无状态客户端，服务端用复制的目录树本地解析 | 请求合并 | 协调者 + 广播失效 | 协调者 | DL 负载，目录树可复制到每个节点 |
 | [Tectonic](tectonic-fast2021/deep-read.md) | 逐级查 ZippyDB | 分片内事务 | 非原子 move + backpointer | 无 | 可接受非原子 move 的数仓/Blob |
 | [FileScale](filescale-socc2023.md) | 按前缀独占 NameNode 内的并行哈希查找 | NameNode 内存串行 | 刷脏后交给数据库事务 | ZooKeeper 挂载表 | HDFS 兼容，小规模即需高效 |
@@ -708,7 +708,7 @@ flowchart TB
 
 - Jiahao Li, Biao Cao, et al. *Mantle: Efficient Hierarchical Metadata Management for Cloud Object Storage Services*. ACM SOSP 2025. <https://dl.acm.org/doi/10.1145/3731569.3764824>
 - Yiduo Wang, Yufei Wu, Cheng Li, et al. *CFS: Scaling Metadata Service for Distributed File System via Pruned Scope of Critical Sections*. ACM EuroSys 2023.（本仓库精读：[cfs-eurosys2023.md](cfs-eurosys2023.md)）
-- Wenhao Lv, Youyou Lu, et al. *InfiniFS: An Efficient Metadata Service for Large-Scale Distributed Filesystems*. USENIX FAST 2022.（本仓库精读：[infinifs-fast2022.md](infinifs-fast2022.md)）
+- Wenhao Lv, Youyou Lu, et al. *InfiniFS: An Efficient Metadata Service for Large-Scale Distributed Filesystems*. USENIX FAST 2022.（本仓库精读：[infinifs-fast2022/deep-read.md](infinifs-fast2022/deep-read.md)）
 - Siyang Li, Youyou Lu, et al. *LocoFS: A Loosely-Coupled Metadata Service for Distributed File Systems*. SC 2017.
 - Satadru Pan et al. *Facebook's Tectonic Filesystem: Efficiency from Exascale*. USENIX FAST 2021.（本仓库精读：[tectonic-fast2021/deep-read.md](tectonic-fast2021/deep-read.md)）
 - Jingwei Xu et al. *FalconFS: Distributed File System for Large-Scale Deep Learning Pipeline*. USENIX NSDI 2026.（本仓库精读：[falconfs-nsdi2026.md](falconfs-nsdi2026.md)）
@@ -717,4 +717,4 @@ flowchart TB
 - Scott A. Brandt et al. *Efficient Metadata Management in Large Distributed Storage Systems*（Lazy Hybrid）. MSST 2003.
 - Diego Ongaro, John Ousterhout. *In Search of an Understandable Consensus Algorithm*. USENIX ATC 2014.
 - Chao Dong et al. *Low-Latency and Scalable Full-Path Indexing Metadata Service for Distributed File Systems*（Duplex）. ICCD 2023.
-- 本仓库相关：[元数据扩展性综述](metadata-scalability.md)、[CFS 精读](cfs-eurosys2023.md)、[InfiniFS 精读](infinifs-fast2022.md)、[FalconFS 精读](falconfs-nsdi2026.md)、[Tectonic 精读](tectonic-fast2021/deep-read.md)、[FileScale 精读](filescale-socc2023.md)、[λFS 精读](lambdafs-asplos2023.md)、[SingularFS 精读](singularfs-atc2023.md)
+- 本仓库相关：[元数据扩展性综述](metadata-scalability.md)、[CFS 精读](cfs-eurosys2023.md)、[InfiniFS 精读](infinifs-fast2022/deep-read.md)、[FalconFS 精读](falconfs-nsdi2026.md)、[Tectonic 精读](tectonic-fast2021/deep-read.md)、[FileScale 精读](filescale-socc2023.md)、[λFS 精读](lambdafs-asplos2023.md)、[SingularFS 精读](singularfs-atc2023.md)

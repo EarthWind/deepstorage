@@ -8,7 +8,7 @@
 >
 > 精读日期：2026-11-22。文中**数字、表格与机制描述均摘自论文原文**（标注所在章节）；标注"解读"的段落是本文作者的分析与推论，不是论文原话。
 >
-> 相关文档：[元数据扩展性综述中的 SingularFS 小节](metadata-scalability.md#24-singularfs-a-billion-scale-distributed-file-system-using-a-single-metadata-serverusenix-atc-2023)、[新硬件综述中的 SingularFS 小节](new-hardware.md#7-singularfs-a-billion-scale-distributed-file-system-using-a-single-metadata-server)、[InfiniFS（FAST 2022）精读](infinifs-fast2022.md)（同一团队的多服务器路线，也是本文的主要对比对象）、[CFS（EuroSys 2023）精读](cfs-eurosys2023.md)（同年另一条"裁剪临界区"路线）、[HMFS（SoCC 2025）精读](hmfs-socc2025.md)（同组后续工作，把有序树换成哈希表 + 目录内链表，并以本文为主要基线）、[MesaFS（EuroSys 2026）精读](mesafs-eurosys2026.md)（同一第一作者在 SSD 上的后续工作，无日志有序更新 + 半有序布局）。
+> 相关文档：[元数据扩展性综述中的 SingularFS 小节](metadata-scalability.md#24-singularfs-a-billion-scale-distributed-file-system-using-a-single-metadata-serverusenix-atc-2023)、[新硬件综述中的 SingularFS 小节](new-hardware.md#7-singularfs-a-billion-scale-distributed-file-system-using-a-single-metadata-server)、[InfiniFS（FAST 2022）精读](infinifs-fast2022/deep-read.md)（同一团队的多服务器路线，也是本文的主要对比对象）、[CFS（EuroSys 2023）精读](cfs-eurosys2023.md)（同年另一条"裁剪临界区"路线）、[HMFS（SoCC 2025）精读](hmfs-socc2025.md)（同组后续工作，把有序树换成哈希表 + 目录内链表，并以本文为主要基线）、[MesaFS（EuroSys 2026）精读](mesafs-eurosys2026.md)（同一第一作者在 SSD 上的后续工作，无日志有序更新 + 半有序布局）。
 
 ## 目录
 
@@ -656,7 +656,7 @@ flowchart LR
 ## 参考
 
 - Hao Guo, Youyou Lu, Wenhao Lv, Xiaojian Liao, Shaoxun Zeng, Jiwu Shu. *SingularFS: A Billion-Scale Distributed File System Using a Single Metadata Server*. USENIX ATC 2023. <https://www.usenix.org/conference/atc23/presentation/guo>
-- Wenhao Lv et al. *InfiniFS: An Efficient Metadata Service for Large-Scale Distributed Filesystems*. USENIX FAST 2022. 本仓库精读：[infinifs-fast2022.md](infinifs-fast2022.md)
+- Wenhao Lv et al. *InfiniFS: An Efficient Metadata Service for Large-Scale Distributed Filesystems*. USENIX FAST 2022. 本仓库精读：[infinifs-fast2022/deep-read.md](infinifs-fast2022/deep-read.md)
 - Yiduo Wang et al. *CFS: Scaling Metadata Service for Distributed File System via Pruned Scope of Critical Sections*. EuroSys 2023. 本仓库精读：[cfs-eurosys2023.md](cfs-eurosys2023.md)
 - Jian Xu, Steven Swanson. *NOVA: A Log-structured File System for Hybrid Volatile/Non-volatile Main Memories*. USENIX FAST 2016.
 - Gregory R. Ganger et al. *Soft Updates: A Solution to the Metadata Update Problem in File Systems*. ACM TOCS 2000.

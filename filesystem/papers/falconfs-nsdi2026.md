@@ -8,7 +8,7 @@
 >
 > 精读日期：2026-11-22。文中**数字、表格与机制描述均摘自论文原文**（标注所在章节）；标注"解读"的段落是本文作者的分析与推论，不是论文原话。
 >
-> 相关文档：[元数据扩展性综述中的 FalconFS 小节](metadata-scalability.md#29-falconfs-distributed-file-system-for-large-scale-deep-learning-pipelinensdi-2026)、[工业界生产系统中的 FalconFS 小节](industry-production-systems.md#8-huawei-falconfsnsdi-2026)、[HPC 与 AI 训练存储中的 FalconFS 小节](hpc-ai-storage.md#32-falconfs-distributed-file-system-for-large-scale-deep-learning-pipeline)、[InfiniFS（FAST 2022）精读](infinifs-fast2022.md)、[CFS（EuroSys 2023）精读](cfs-eurosys2023.md)、[SingularFS（ATC 2023）精读](singularfs-atc2023.md)。
+> 相关文档：[元数据扩展性综述中的 FalconFS 小节](metadata-scalability.md#29-falconfs-distributed-file-system-for-large-scale-deep-learning-pipelinensdi-2026)、[工业界生产系统中的 FalconFS 小节](industry-production-systems.md#8-huawei-falconfsnsdi-2026)、[HPC 与 AI 训练存储中的 FalconFS 小节](hpc-ai-storage.md#32-falconfs-distributed-file-system-for-large-scale-deep-learning-pipeline)、[InfiniFS（FAST 2022）精读](infinifs-fast2022/deep-read.md)、[CFS（EuroSys 2023）精读](cfs-eurosys2023.md)、[SingularFS（ATC 2023）精读](singularfs-atc2023.md)。
 
 ## 目录
 
@@ -828,7 +828,7 @@ flowchart LR
 
 - Jingwei Xu et al. *FalconFS: Distributed File System for Large-Scale Deep Learning Pipeline*. USENIX NSDI 2026. <https://www.usenix.org/conference/nsdi26/presentation/xu> ；arXiv:2507.10367 <https://arxiv.org/abs/2507.10367>
 - FalconFS 开源代码：<https://github.com/falcon-infra/falconfs> ；<https://gitee.com/openeuler/FalconFS>
-- Wenhao Lv et al. *InfiniFS: An Efficient Metadata Service for Large-Scale Distributed Filesystems*. USENIX FAST 2022. 本仓库精读：[infinifs-fast2022.md](infinifs-fast2022.md)
+- Wenhao Lv et al. *InfiniFS: An Efficient Metadata Service for Large-Scale Distributed Filesystems*. USENIX FAST 2022. 本仓库精读：[infinifs-fast2022/deep-read.md](infinifs-fast2022/deep-read.md)
 - Yiduo Wang et al. *CFS: Scaling Metadata Service for Distributed File System via Pruned Scope of Critical Sections*. EuroSys 2023. 本仓库精读：[cfs-eurosys2023.md](cfs-eurosys2023.md)
 - Hao Guo et al. *SingularFS: A Billion-Scale Distributed File System Using a Single Metadata Server*. USENIX ATC 2023. 本仓库精读：[singularfs-atc2023.md](singularfs-atc2023.md)
 - Jiahao Li et al. *Mantle: Efficient Hierarchical Metadata Management for Cloud Object Storage Services*. SOSP 2025.（并发的服务端解析工作，本仓库精读：[mantle-sosp2025.md](mantle-sosp2025.md)）

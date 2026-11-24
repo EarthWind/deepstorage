@@ -13,7 +13,7 @@
 > 相关文档：
 > - [元数据扩展性综述 §2.5](metadata-scalability.md#25-λfs-a-scalable-and-elastic-distributed-file-system-metadata-service-using-serverless-functionsasplos-2023)：本文的简述版。
 > - [CFS（EuroSys 2023）精读](cfs-eurosys2023.md)：同样以 HopsFS 为基线，但路线相反，CFS 去掉代理层，λFS 把代理层做成弹性缓存。
-> - [InfiniFS（FAST 2022）精读](infinifs-fast2022.md)：λFS 论文中的对比对象之一，固定规模的元数据集群。
+> - [InfiniFS（FAST 2022）精读](infinifs-fast2022/deep-read.md)：λFS 论文中的对比对象之一，固定规模的元数据集群。
 > - [Tectonic（FAST 2021）精读](tectonic-fast2021/deep-read.md)：同属"无状态元数据层 + 分片事务存储"的分离式架构。
 > - [FileScale（SoCC 2023）精读](filescale-socc2023.md)：同样在数据库之上加缓存，但用前缀独占的写回缓存，写也能接近单机 HDFS。
 
@@ -761,7 +761,7 @@ xychart-beta
 |------|-------------------|------|--------|--------------|
 | HopsFS（FAST 2017） | 无状态代理 | 静态 | NDB 行锁 + 事务 | λFS 的基础系统 |
 | [CFS](cfs-eurosys2023.md)（EuroSys 2023） | **去掉代理层**，客户端直接访问 TafDB | 依赖底层 KV | 单分片原语 + 裁剪临界区 | 同样以 HopsFS 为基线；CFS 攻锁开销，λFS 攻弹性和缓存，正交 |
-| [InfiniFS](infinifs-fast2022.md)（FAST 2022） | 有状态 MDS | 静态 | 本地事务 + 跨服务器 2PC | λFS 论文点名的"固定集群"代表 |
+| [InfiniFS](infinifs-fast2022/deep-read.md)（FAST 2022） | 有状态 MDS | 静态 | 本地事务 + 跨服务器 2PC | λFS 论文点名的"固定集群"代表 |
 | [Tectonic](tectonic-fast2021/deep-read.md)（FAST 2021） | 无状态元数据服务 | 改路由即可扩缩 | ZippyDB 单分片事务 | 同属"计算无状态 + 状态下沉到 KV"的分离式架构 |
 | [SingularFS](singularfs-atc2023.md)（ATC 2023） | 单台元数据服务器 | 无 | 无日志操作 + 层级并发控制 | 路线相反：单机做到极致，不需要弹性 |
 | [3FS](3fs-fireflyer-sc2024.md) | 无状态元数据服务 | 可随意增减 | FoundationDB 事务 | 工业界同类做法，没有缓存层 |
@@ -852,10 +852,10 @@ flowchart TB
 - λFS 源代码：<https://github.com/ds2-lab/LambdaFS>；负载驱动：<https://github.com/ds2-lab/LambdaFS-Benchmark-Utility>
 - Salman Niazi et al. *HopsFS: Scaling Hierarchical File System Metadata Using NewSQL Databases*. USENIX FAST 2017.
 - Kai Ren, Qing Zheng, Swapnil Patil, Garth Gibson. *IndexFS: Scaling File System Metadata Performance with Stateless Caching and Bulk Insertion*. SC 2014.
-- Wenhao Lv et al. *InfiniFS: An Efficient Metadata Service for Large-Scale Distributed Filesystems*. USENIX FAST 2022.（本仓库精读：[infinifs-fast2022.md](infinifs-fast2022.md)）
+- Wenhao Lv et al. *InfiniFS: An Efficient Metadata Service for Large-Scale Distributed Filesystems*. USENIX FAST 2022.（本仓库精读：[infinifs-fast2022/deep-read.md](infinifs-fast2022/deep-read.md)）
 - Ao Wang et al. *InfiniCache: Exploiting Ephemeral Serverless Functions to Build a Cost-Effective Memory Cache*. USENIX FAST 2020.
 - Jingyuan Zhang et al. *InfiniStore: Elastic Serverless Cloud Storage*. PVLDB 16(7), 2023.
 - Liang Wang et al. *Peeking Behind the Curtains of Serverless Platforms*. USENIX ATC 2018.
 - Sadjad Fouladi et al. *Encoding, Fast and Slow: Low-Latency Video Processing Using Thousands of Tiny Threads*. USENIX NSDI 2017.
 - Kai Li, Paul Hudak. *Memory Coherence in Shared Virtual Memory Systems*. ACM TOCS 7(4), 1989.
-- 本仓库相关：[元数据扩展性综述](metadata-scalability.md)、[CFS 精读](cfs-eurosys2023.md)、[InfiniFS 精读](infinifs-fast2022.md)、[SingularFS 精读](singularfs-atc2023.md)、[Tectonic 精读](tectonic-fast2021/deep-read.md)、[3FS 精读](3fs-fireflyer-sc2024.md)、[FalconFS 精读](falconfs-nsdi2026.md)
+- 本仓库相关：[元数据扩展性综述](metadata-scalability.md)、[CFS 精读](cfs-eurosys2023.md)、[InfiniFS 精读](infinifs-fast2022/deep-read.md)、[SingularFS 精读](singularfs-atc2023.md)、[Tectonic 精读](tectonic-fast2021/deep-read.md)、[3FS 精读](3fs-fireflyer-sc2024.md)、[FalconFS 精读](falconfs-nsdi2026.md)

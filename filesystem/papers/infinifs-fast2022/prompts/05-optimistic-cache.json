@@ -1,0 +1,28 @@
+{
+  "prompt": "【类型】机制拆解图（左右两半 + 底部对比条）\n【主题】海量客户端下，缓存怎么保持一致又不打爆近根目录\n【视觉结构】横版\n- 左半 \"目录 rename 时（写路径）\"，编号 ①②③：\n  ① 客户端发 rename(src, des) 到橙色 \"Rename Coordinator\"：检查 \"Renaming Graph 是否形成孤儿环\"，分配递增版本号 \"ver = 5\"\n  ② 锁住目标目录，并行广播 \"⟨ver 5, rename op⟩\" 到所有 MetaServer 的 \"Inv. List\"（每个列表画成按版本排序的小表：ver 3 / ver 4 / ver 5）\n  ③ 把目录访问元数据从源服务器搬到目标服务器，必要时更新 RL/BP\n  旁注：\"只通知几十台服务器，而不是成千上万客户端\"\n- 右半 \"普通请求时（读路径）\"，编号 ①②③：\n  ① 客户端 \"AM-Cache\"：画一棵缓存树，根附近节点加粗（标 \"近根目录常驻\"），叶子节点用链连成 \"LRU\"；客户端本地版本 \"ver = 3\"\n  ② 请求带 \"路径 + ver 3\" 发到 MetaServer；服务器只把路径与 Inv. List 中 ver 4、ver 5 的 rename 比对\n  ③a 无冲突 → 正常处理（深蓝勾）；③b 冲突 → 中止并返回 ver 4–5 的 rename 信息，客户端更新缓存与版本（橙色）\n- 底部对比条（两列）：\"Lease（NFSv4、IndexFS、LocoFS）：所有客户端反复续约近根目录 → 新热点\" vs \"惰性失效（InfiniFS）：无续约，失效只在 rename 时发生（约 0.0083% 的操作）\"\n【语言】中文（英文术语、变量名、函数名按原样保留，不要改写拼写）\n【必须出现的标签】AM-Cache、树形缓存 + 叶子 LRU、近根目录常驻、Rename Coordinator、broadcast、Inv. List、请求携带版本号、过期则中止并返回新 rename、对比 lease\n【风格】paper-figure：像 FAST/OSDI 顶会论文中重新设计过的高质量方法总览图。纯白或极浅灰底；干净的矢量感模块（圆角矩形、分组框、键值小格、编号步骤圆点）；无衬线字体短标签；黑/深灰为主色，只用两个强调色：深蓝（InfiniFS 的核心设计/关键路径）与橙色（问题、热点、对比项）；主路径箭头粗、辅助箭头细；主体图解占画面 75%-85%，信息密度高但不拥挤；右下角小号页码。\n【禁止】不要手绘风、不要蓝底白线工程图纸风、不要 3D 渲染、不要照片写实、不要渐变和过饱和色；不要营销海报或 PPT 封面感；不要大段说明文字；不要随机英文或拼写变体；不要水印；不要复刻论文原图布局。\n页码：6/8",
+  "negativePrompt": "手绘，涂鸦，蓝图风，3D渲染，照片写实，渐变，过饱和，海报风，水印，模糊文字，错乱标签，随机英文，拼写错误，大面积空白",
+  "aspectRatio": "16:9",
+  "imageSize": "1K",
+  "caption": "乐观访问元数据缓存与惰性失效",
+  "intent": "客户端只缓存目录访问元数据（树形 + 叶子 LRU）；目录 rename 只广播给元数据服务器的失效列表；客户端带版本号发请求，由服务器惰性判断是否过期",
+  "figure_spec": {
+    "figure_kind": "mechanism schematic",
+    "caption": "乐观访问元数据缓存与惰性失效",
+    "communicative_intent": "客户端只缓存目录访问元数据（树形 + 叶子 LRU）；目录 rename 只广播给元数据服务器的失效列表；客户端带版本号发请求，由服务器惰性判断是否过期",
+    "required_labels": [
+      "AM-Cache",
+      "树形缓存 + 叶子 LRU",
+      "近根目录常驻",
+      "Rename Coordinator",
+      "broadcast",
+      "Inv. List",
+      "请求携带版本号",
+      "过期则中止并返回新 rename",
+      "对比 lease"
+    ],
+    "forbidden_labels": [],
+    "layout_brief": "横版 16:9，见 prompt 视觉结构",
+    "style_brief": "paper-figure 顶会框架图风，中文",
+    "source_context": "Wenhao Lv et al., InfiniFS: An Efficient Metadata Service for Large-Scale Distributed Filesystems, FAST 2022"
+  }
+}

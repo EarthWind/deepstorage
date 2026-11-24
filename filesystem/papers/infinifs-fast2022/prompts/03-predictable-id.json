@@ -1,0 +1,27 @@
+{
+  "prompt": "【类型】机制拆解图（三步时间线）\n【主题】为什么客户端能\"算出\"目录 ID\n【视觉结构】横版，上方一条公式带 + 下方三格时间线\n- 顶部公式带（深蓝底框）：\"目录 ID = h(出生父目录 ID, 目录名, 版本号)\"，旁注 \"h = SHA-256 等密码学哈希；三元组全局唯一 ⇒ ID 唯一\"\n- 下方三格，从左到右，用编号圆点 ①②③：\n  ① \"创建\"：树 / → A → B。标注 \"A = h(1, A, 0) = 2\"，\"B = h(2, B, 0) = 3\"\n  ② \"首次 rename：rename(/A/B, /B)\"：B 移到根下；B 的访问元数据 key 从 \"2:B\" 变为 \"1:B\"，ID 仍为 3（深蓝高亮 \"ID 不变，子孙元数据不动\"）；\n     A 处挂一个小标签 \"RL: ⟨B, 0⟩\"（橙色），B 处挂 \"BP: ⟨2, 0⟩\"（橙色）；\n     旁边虚线框：\"此时再 mkdir /A/B → 版本号取 1 → 新 B = h(2, B, 1) = 13\"\n  ③ \"删除已重命名目录：rmdir /B\"：通过 BP 找到 A，擦除 A 的 RL；旁注 \"再 mkdir /A/B 时版本号回到 0\"\n- 右下角小框 \"哈希冲突\"：插入内容元数据 ⟨id⟩ 时发现已存在 → 按 rename 同样方式用版本号 + RL/BP 处理\n【语言】中文（英文术语、变量名、函数名按原样保留，不要改写拼写）\n【必须出现的标签】birth triple、ID = h(pid, name, ver)、SHA-256、rename 只改 key、RL 重命名列表、BP 回指针、version、哈希冲突检测\n【风格】paper-figure：像 FAST/OSDI 顶会论文中重新设计过的高质量方法总览图。纯白或极浅灰底；干净的矢量感模块（圆角矩形、分组框、键值小格、编号步骤圆点）；无衬线字体短标签；黑/深灰为主色，只用两个强调色：深蓝（InfiniFS 的核心设计/关键路径）与橙色（问题、热点、对比项）；主路径箭头粗、辅助箭头细；主体图解占画面 75%-85%，信息密度高但不拥挤；右下角小号页码。\n【禁止】不要手绘风、不要蓝底白线工程图纸风、不要 3D 渲染、不要照片写实、不要渐变和过饱和色；不要营销海报或 PPT 封面感；不要大段说明文字；不要随机英文或拼写变体；不要水印；不要复刻论文原图布局。\n页码：4/8",
+  "negativePrompt": "手绘，涂鸦，蓝图风，3D渲染，照片写实，渐变，过饱和，海报风，水印，模糊文字，错乱标签，随机英文，拼写错误，大面积空白",
+  "aspectRatio": "16:9",
+  "imageSize": "1K",
+  "caption": "可预测的目录 ID：哈希出生三元组，rename 不改 ID",
+  "intent": "目录 ID = hash(出生父目录 ID, 名字, 版本号)；rename 只改访问元数据的 key，ID 不变；首次 rename 在出生父目录记 RL、在自身记 BP，用版本号保证唯一",
+  "figure_spec": {
+    "figure_kind": "mechanism schematic",
+    "caption": "可预测的目录 ID：哈希出生三元组，rename 不改 ID",
+    "communicative_intent": "目录 ID = hash(出生父目录 ID, 名字, 版本号)；rename 只改访问元数据的 key，ID 不变；首次 rename 在出生父目录记 RL、在自身记 BP，用版本号保证唯一",
+    "required_labels": [
+      "birth triple",
+      "ID = h(pid, name, ver)",
+      "SHA-256",
+      "rename 只改 key",
+      "RL 重命名列表",
+      "BP 回指针",
+      "version",
+      "哈希冲突检测"
+    ],
+    "forbidden_labels": [],
+    "layout_brief": "横版 16:9，见 prompt 视觉结构",
+    "style_brief": "paper-figure 顶会框架图风，中文",
+    "source_context": "Wenhao Lv et al., InfiniFS: An Efficient Metadata Service for Large-Scale Distributed Filesystems, FAST 2022"
+  }
+}
