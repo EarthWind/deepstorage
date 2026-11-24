@@ -14,7 +14,7 @@
 > - [Fisc（FAST 2023）精读](fisc-fast2023.md)：同一会议、同一团队，盘古之上的云原生文件系统接入层。
 > - [InfiniFS（FAST 2022）精读](infinifs-fast2022.md)：盘古元数据服务采用的并行路径解析等技术来源。
 > - [工业界生产系统中的盘古小节](industry-production-systems.md#3-alibaba-pangu-more-than-capacityfast-2023)。
-> - [Tectonic（FAST 2021）精读](tectonic-fast2021/README.md)：同为"重客户端"的超大规模生产文件系统。
+> - [Tectonic（FAST 2021）精读](tectonic-fast2021/deep-read.md)：同为"重客户端"的超大规模生产文件系统。
 > - [EBS Glory（FAST 2024）精读](ebs-fast2024.md)：建在盘古之上的阿里云块存储三代演进，可与本文流量放大、FPGA 压缩部分对照。
 
 ## 目录
@@ -768,7 +768,7 @@ PMem 有很多优点：持久化快、对 RDMA 友好、读延迟低（PMem 6 µ
 | 节点内优化 | USSOS、RDCA、mwait、FPGA 压缩、网卡 CRC | 论文未重点讨论 | 用户态 chunk 引擎、RDMA | DPU、FPGA 快路径 |
 | 网络 | RoCE，从无损改为有损 | 以太网 | IB，关闭 DCQCN | RDMA（Luna/Solar） |
 
-> 对比表中他人系统的特征只是概括，细节以各自论文和本仓库对应精读为准：[Tectonic](tectonic-fast2021/README.md)、[3FS](3fs-fireflyer-sc2024.md)、[Fisc](fisc-fast2023.md)。
+> 对比表中他人系统的特征只是概括，细节以各自论文和本仓库对应精读为准：[Tectonic](tectonic-fast2021/deep-read.md)、[3FS](3fs-fireflyer-sc2024.md)、[Fisc](fisc-fast2023.md)。
 
 **解读**：盘古和 Tectonic 在架构层面非常相似（只追加、重客户端、元数据分层），差别主要在**关注点**：Tectonic 论文讲的是如何把多个专用集群合并成一个多租户集群（效率来自规模），盘古论文讲的是如何在单节点上把硬件吃满（效率来自深度优化）。3FS 则代表另一种取舍：为 AI 训练的大块随机读放弃只追加语义，用链复制换取全副本读带宽。
 
@@ -877,7 +877,7 @@ flowchart TB
 - Ruiming Lu et al. *Perseus: A Fail-Slow Detection Framework for Cloud Storage Systems*. USENIX FAST 2023.
 - Yixiao Gao et al. *When Cloud Storage Meets RDMA*. USENIX NSDI 2021.
 - Rui Miao et al. *From Luna to Solar: The Evolutions of the Compute-to-Storage Networks in Alibaba Cloud*. ACM SIGCOMM 2022.
-- Satadru Pan et al. *Facebook's Tectonic Filesystem: Efficiency from Exascale*. USENIX FAST 2021.（本仓库精读：[tectonic-fast2021/README.md](tectonic-fast2021/README.md)）
+- Satadru Pan et al. *Facebook's Tectonic Filesystem: Efficiency from Exascale*. USENIX FAST 2021.（本仓库精读：[tectonic-fast2021/deep-read.md](tectonic-fast2021/deep-read.md)）
 - Saksham Agarwal et al. *Understanding Host Interconnect Congestion*. ACM HotNets 2022.
 - Intel. *Data Direct I/O Technology (DDIO): A Primer*.
 - 本仓库相关：[工业界生产系统](industry-production-systems.md)、[客户端与通用技术](client-and-general-techniques.md)（纠删码章节）、[Fire-Flyer AI-HPC 精读](fireflyer-aihpc-sc2024.md)、[DAOS 精读](daos-scfa2020.md)、[LineFS 精读](linefs-sosp2021.md)

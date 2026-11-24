@@ -8,7 +8,7 @@
 >
 > 精读日期：2026-11-21。文中**数字、表格与机制描述均摘自论文原文**（标注所在章节）；标注"解读"的段落是本文作者的分析与推论，不是论文原话。
 >
-> 前置阅读：[Tectonic（FAST 2021）精读](tectonic-fast2021/README.md)。Tectonic-Shift 是在 Tectonic 之上为 ML 训练加的一层 flash 缓存，很多概念（block、chunk、seal、Client Library、Metadata Layer）直接沿用前作。
+> 前置阅读：[Tectonic（FAST 2021）精读](tectonic-fast2021/deep-read.md)。Tectonic-Shift 是在 Tectonic 之上为 ML 训练加的一层 flash 缓存，很多概念（block、chunk、seal、Client Library、Metadata Layer）直接沿用前作。
 >
 > 相关文档：[工业界生产系统综述中的 Tectonic-Shift 小节](industry-production-systems.md#2-tectonic-shiftatc-2023)、[HPC 与 AI 训练存储](hpc-ai-storage.md)、[论文清单](essential-papers-2000-2026.md)。
 
@@ -85,7 +85,7 @@ flowchart LR
 - **数据集规格**：ML 工程师给每个作业指定一个数据集，包含**一组表分区**和**一组 feature ID**。Readers 在作业生命周期内持续读不相交的 minibatch，直到所有 Readers 合起来把指定分区读完一遍。
 - **读路径**：Readers 先查 Hive Metastore 把分区映射到 Tectonic 文件，再按文件 footer 中的元数据**只读所需特征对应的字节**（过滤下推到存储），并把读合并成 **O(1 MB)** 的大 IO 以减少 HDD 寻道。
 
-Tectonic 本身（§2，详见[前作精读](tectonic-fast2021/README.md)）：文件切成 block（通常 **72 MiB**），block 再切成 chunk（通常 **8 MiB**），以副本或 RS 编码分布到 HDD 存储节点；Client Library 暴露 `pread` 接口，直接读 chunk；元数据由基于 ZippyDB 的哈希分片 Metadata Layer 提供。
+Tectonic 本身（§2，详见[前作精读](tectonic-fast2021/deep-read.md)）：文件切成 block（通常 **72 MiB**），block 再切成 chunk（通常 **8 MiB**），以副本或 RS 编码分布到 HDD 存储节点；Client Library 暴露 `pread` 接口，直接读 chunk；元数据由基于 ZippyDB 的哈希分片 Metadata Layer 提供。
 
 **解读**：这里有两个后文反复用到的前提。第一，训练作业读什么是**作业启动时就确定的**（分区列表 + 特征列表），只是读的时间点不确定。第二，训练数据是**写一次、seal 后不再修改**的，缓存不需要处理失效。Shift 的设计几乎都建立在这两点上。
 
@@ -733,7 +733,7 @@ mindmap
 
 | 系统 | 训练数据读加速方式 | 与 Shift 的关键差异 |
 |------|--------------------|---------------------|
-| [Tectonic（FAST 2021）](tectonic-fast2021/README.md) | 存储节点每台 1 TB SSD 缓存热 chunk + 存 XFS 元数据 | 节点内、chunk 粒度、通用策略；Shift 是独立的 flash 集群、segment 粒度、应用感知 |
+| [Tectonic（FAST 2021）](tectonic-fast2021/deep-read.md) | 存储节点每台 1 TB SSD 缓存热 chunk + 存 XFS 元数据 | 节点内、chunk 粒度、通用策略；Shift 是独立的 flash 集群、segment 粒度、应用感知 |
 | Quiver（FAST 2020） | 按样本的内容寻址缓存，利用深度学习对样本顺序不敏感来"替换"未命中的样本 | Quiver 能改变读取顺序，因为它和训练框架紧耦合；Shift 对应用透明，只能决定缓存什么 |
 | SHADE（FAST 2023） | 按样本重要性做缓存与采样 | 同样是"应用语义驱动缓存"，但 SHADE 要改训练流程 |
 | 3FS（DeepSeek） | 全 NVMe + RDMA，不靠缓存 | 直接选择"纯 flash"路线（即论文表 1 的方案 2）；适合数据集相对小、IO 极高的 LLM 训练，与 DLRM PB 级数据集的取舍不同 |
@@ -803,7 +803,7 @@ flowchart TB
 ## 参考
 
 - Mark Zhao et al. *Tectonic-Shift: A Composite Storage Fabric for Large-Scale ML Training*. USENIX ATC 2023. <https://www.usenix.org/conference/atc23/presentation/zhao>
-- Satadru Pan et al. *Facebook's Tectonic Filesystem: Efficiency from Exascale*. USENIX FAST 2021. 本仓库精读：[tectonic-fast2021/README.md](tectonic-fast2021/README.md)
+- Satadru Pan et al. *Facebook's Tectonic Filesystem: Efficiency from Exascale*. USENIX FAST 2021. 本仓库精读：[tectonic-fast2021/deep-read.md](tectonic-fast2021/deep-read.md)
 - Mark Zhao et al. *Understanding Data Storage and Ingestion for Large-Scale Deep Recommendation Model Training*. ISCA 2022.（论文中的 DSI 负载刻画来源）
 - Benjamin Berg et al. *The CacheLib Caching Engine: Design and Experiences at Scale*. OSDI 2020.
 - Tzu-Wei Yang et al. *CacheSack: Admission Optimization for Google Datacenter Flash Caches*. USENIX ATC 2022.

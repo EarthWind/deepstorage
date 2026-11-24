@@ -10,7 +10,7 @@
 >
 > 精读日期：2026-11-23（三篇博客均为当日抓取的版本）。文中用"2021 博客"、"2025 SSD 博客"、"2025 Rapid 博客"标注出处。标"解读"的段落是本文作者的分析和推论；凡是博客没有写、本文根据其他公开资料或常识补充的内容，都单独注明。
 >
-> 相关文档：[工业界生产系统中的 Colossus 小节](industry-production-systems.md#9-google-colossus-与-cachesack)（含 CacheSack）、[Tectonic（FAST 2021）精读](tectonic-fast2021/README.md)、[盘古 2.0（FAST 2023）精读](pangu-fast2023.md)、[Tectonic-Shift（ATC 2023）精读](tectonic-shift-atc2023.md)（与 L4 缓存同类的 flash 读缓存）。
+> 相关文档：[工业界生产系统中的 Colossus 小节](industry-production-systems.md#9-google-colossus-与-cachesack)（含 CacheSack）、[Tectonic（FAST 2021）精读](tectonic-fast2021/deep-read.md)、[盘古 2.0（FAST 2023）精读](pangu-fast2023.md)、[Tectonic-Shift（ATC 2023）精读](tectonic-shift-atc2023.md)（与 L4 缓存同类的 flash 读缓存）。
 
 ## 目录
 
@@ -54,7 +54,7 @@
 **解读**：
 
 - 2021 博客的信息量其实很有限：五个组件各一段，加上共享存储池和冷热分层两个观点，没有一致性模型、没有数据布局、没有故障恢复流程、没有性能数字。它之所以被反复引用，是因为这是 Google 少有的官方说法。2025 年两篇续篇补上了规模数字、只追加语义、SSD 放置和客户端协议，三篇合读才勉强能拼出 Colossus 的轮廓。
-- Colossus 的设计思路与后来公开的 [Tectonic](tectonic-fast2021/README.md)、[盘古](pangu-fast2023.md) 高度一致：**元数据交给可扩展的 KV/表存储、客户端库承担冗余编码并直连存储节点、后台任务独立成组件、多业务共享一个大集群**。从时间上看，Colossus 是这条路线的先行者（2010 年前后已在使用）。
+- Colossus 的设计思路与后来公开的 [Tectonic](tectonic-fast2021/deep-read.md)、[盘古](pangu-fast2023.md) 高度一致：**元数据交给可扩展的 KV/表存储、客户端库承担冗余编码并直连存储节点、后台任务独立成组件、多业务共享一个大集群**。从时间上看，Colossus 是这条路线的先行者（2010 年前后已在使用）。
 - Colossus 最独特的地方在于**用自己的上层系统存自己的元数据**：Curator 的元数据存在 BigTable 里，而 BigTable 本身又存在 Colossus 上。博客没有解释这个循环如何收敛，§4.3 讨论这一点。
 
 ---
@@ -291,7 +291,7 @@ flowchart LR
 
 **解读**：
 
-- 这与 [Tectonic](tectonic-fast2021/README.md) 的核心论点完全相同：Meta 把 Haystack、f4、HDFS 等多个专用集群合并成一个多租户 Tectonic 集群，靠的也是"不同负载的峰谷互补"。Tectonic 论文给出了详细的租户隔离机制（流量组、全局与本地限流），Colossus 博客只说了结论。
+- 这与 [Tectonic](tectonic-fast2021/deep-read.md) 的核心论点完全相同：Meta 把 Haystack、f4、HDFS 等多个专用集群合并成一个多租户 Tectonic 集群，靠的也是"不同负载的峰谷互补"。Tectonic 论文给出了详细的租户隔离机制（流量组、全局与本地限流），Colossus 博客只说了结论。
 - "每个应用感觉拥有隔离的文件系统"需要强有力的**性能隔离**，否则批处理会拖慢 YouTube。博客没有描述隔离机制，§6 的"服务层级 + 抽象资源单位"可能是其中一部分。
 
 ---
@@ -569,7 +569,7 @@ stateDiagram-v2
 | 2021 博客（同文另一段） | Spanner 存储（各存储服务的）访问权限和数据位置元数据 |
 | Tectonic 论文（FAST 2021，§7 相关工作） | "Colossus uses **Spanner**, a globally consistent database to store filesystem metadata" |
 
-**解读**：以 Google 官方博客为准，Colossus 文件系统元数据存在 BigTable。Tectonic 论文的说法很可能混淆了两层元数据：Spanner 存的是 Cloud Storage 等**上层服务**的元数据。这一点在本仓库的 [Tectonic 精读](tectonic-fast2021/README.md) 中按论文原文转述，已加注说明。
+**解读**：以 Google 官方博客为准，Colossus 文件系统元数据存在 BigTable。Tectonic 论文的说法很可能混淆了两层元数据：Spanner 存的是 Cloud Storage 等**上层服务**的元数据。这一点在本仓库的 [Tectonic 精读](tectonic-fast2021/deep-read.md) 中按论文原文转述，已加注说明。
 
 ### 11.2 博客没有回答的问题
 
@@ -712,4 +712,4 @@ flowchart TB
 - Tzu-Wei Yang et al. *CacheSack: Admission Optimization for Google Datacenter Flash Caches*. USENIX ATC 2022.
 - Michael Marty et al. *Snap: a Microkernel Approach to Host Networking*. SOSP 2019.
 - Satadru Pan et al. *Facebook's Tectonic Filesystem: Efficiency from Exascale*. USENIX FAST 2021.（§7 相关工作中关于 Colossus 使用 Spanner 的说法）
-- 本仓库相关：[工业界生产系统](industry-production-systems.md)、[Tectonic 精读](tectonic-fast2021/README.md)、[Tectonic-Shift 精读](tectonic-shift-atc2023.md)、[盘古 2.0 精读](pangu-fast2023.md)、[3FS 精读](3fs-fireflyer-sc2024.md)、[Fisc 精读](fisc-fast2023.md)
+- 本仓库相关：[工业界生产系统](industry-production-systems.md)、[Tectonic 精读](tectonic-fast2021/deep-read.md)、[Tectonic-Shift 精读](tectonic-shift-atc2023.md)、[盘古 2.0 精读](pangu-fast2023.md)、[3FS 精读](3fs-fireflyer-sc2024.md)、[Fisc 精读](fisc-fast2023.md)

@@ -14,7 +14,7 @@
 > - [元数据扩展性综述 §2.5](metadata-scalability.md#25-λfs-a-scalable-and-elastic-distributed-file-system-metadata-service-using-serverless-functionsasplos-2023)：本文的简述版。
 > - [CFS（EuroSys 2023）精读](cfs-eurosys2023.md)：同样以 HopsFS 为基线，但路线相反，CFS 去掉代理层，λFS 把代理层做成弹性缓存。
 > - [InfiniFS（FAST 2022）精读](infinifs-fast2022.md)：λFS 论文中的对比对象之一，固定规模的元数据集群。
-> - [Tectonic（FAST 2021）精读](tectonic-fast2021/README.md)：同属"无状态元数据层 + 分片事务存储"的分离式架构。
+> - [Tectonic（FAST 2021）精读](tectonic-fast2021/deep-read.md)：同属"无状态元数据层 + 分片事务存储"的分离式架构。
 > - [FileScale（SoCC 2023）精读](filescale-socc2023.md)：同样在数据库之上加缓存，但用前缀独占的写回缓存，写也能接近单机 HDFS。
 
 ## 目录
@@ -762,7 +762,7 @@ xychart-beta
 | HopsFS（FAST 2017） | 无状态代理 | 静态 | NDB 行锁 + 事务 | λFS 的基础系统 |
 | [CFS](cfs-eurosys2023.md)（EuroSys 2023） | **去掉代理层**，客户端直接访问 TafDB | 依赖底层 KV | 单分片原语 + 裁剪临界区 | 同样以 HopsFS 为基线；CFS 攻锁开销，λFS 攻弹性和缓存，正交 |
 | [InfiniFS](infinifs-fast2022.md)（FAST 2022） | 有状态 MDS | 静态 | 本地事务 + 跨服务器 2PC | λFS 论文点名的"固定集群"代表 |
-| [Tectonic](tectonic-fast2021/README.md)（FAST 2021） | 无状态元数据服务 | 改路由即可扩缩 | ZippyDB 单分片事务 | 同属"计算无状态 + 状态下沉到 KV"的分离式架构 |
+| [Tectonic](tectonic-fast2021/deep-read.md)（FAST 2021） | 无状态元数据服务 | 改路由即可扩缩 | ZippyDB 单分片事务 | 同属"计算无状态 + 状态下沉到 KV"的分离式架构 |
 | [SingularFS](singularfs-atc2023.md)（ATC 2023） | 单台元数据服务器 | 无 | 无日志操作 + 层级并发控制 | 路线相反：单机做到极致，不需要弹性 |
 | [3FS](3fs-fireflyer-sc2024.md) | 无状态元数据服务 | 可随意增减 | FoundationDB 事务 | 工业界同类做法，没有缓存层 |
 | [FalconFS](falconfs-nsdi2026.md)（NSDI 2026） | 有状态 MDS（PostgreSQL 扩展），每个节点复制整棵目录树 | 静态 | 广播失效代替两阶段加锁 | 同样把缓存从客户端挪到服务端，且同样用"失效广播"维护服务端副本一致；但服务端规模固定 |
@@ -858,4 +858,4 @@ flowchart TB
 - Liang Wang et al. *Peeking Behind the Curtains of Serverless Platforms*. USENIX ATC 2018.
 - Sadjad Fouladi et al. *Encoding, Fast and Slow: Low-Latency Video Processing Using Thousands of Tiny Threads*. USENIX NSDI 2017.
 - Kai Li, Paul Hudak. *Memory Coherence in Shared Virtual Memory Systems*. ACM TOCS 7(4), 1989.
-- 本仓库相关：[元数据扩展性综述](metadata-scalability.md)、[CFS 精读](cfs-eurosys2023.md)、[InfiniFS 精读](infinifs-fast2022.md)、[SingularFS 精读](singularfs-atc2023.md)、[Tectonic 精读](tectonic-fast2021/README.md)、[3FS 精读](3fs-fireflyer-sc2024.md)、[FalconFS 精读](falconfs-nsdi2026.md)
+- 本仓库相关：[元数据扩展性综述](metadata-scalability.md)、[CFS 精读](cfs-eurosys2023.md)、[InfiniFS 精读](infinifs-fast2022.md)、[SingularFS 精读](singularfs-atc2023.md)、[Tectonic 精读](tectonic-fast2021/deep-read.md)、[3FS 精读](3fs-fireflyer-sc2024.md)、[FalconFS 精读](falconfs-nsdi2026.md)
