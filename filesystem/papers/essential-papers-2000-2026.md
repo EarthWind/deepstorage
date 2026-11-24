@@ -106,7 +106,7 @@
 | 2023 | λFS: Scalable and Elastic Distributed File System Metadata Service using Serverless Functions | GMU 等 | ASPLOS | 元数据服务 serverless 化，弹性伸缩 |
 | 2023 | FileScale: Fast and Elastic Metadata Management for Distributed File Systems | UMD | SoCC | HDFS 元数据三层架构：前缀独占写回缓存 + DDBMS 跨分区事务，小规模≈单机、可线性扩展 |
 | 2025 | Mantle: Efficient Hierarchical Metadata Management for Cloud Object Storage | 中科大 / Baidu / 清华 | SOSP | 对象存储之上的层次命名空间与目录语义 |
-| 2025 | HMFS: Decoupling Directory Semantics from Metadata Indexing | 清华 | SoCC | 目录语义与索引分离，路径解析与 rename 的新折中 |
+| 2025 | HMFS: Decoupling Directory Semantics from Metadata Indexing | 清华 | SoCC | 目录遍历语义与元数据索引分离：PM 哈希表 O(1) 点查 + 目录内链表，无日志崩溃一致 |
 | 2026 | MesaFS: An I/O-Efficient Metadata Service for Distributed File Systems | 清华 | EuroSys | 面向元数据 I/O 效率的服务端布局 |
 | 2026 | SwitchFS: Asynchronous Metadata Updates with In-Network Coordination | 上交 IPADS | EuroSys | 可编程交换机参与元数据协调，异步更新保序 |
 | 2026 | FalconFS | Huawei / 上交 IPADS | NSDI | 见第 2 节 |
