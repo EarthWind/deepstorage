@@ -15,6 +15,7 @@
 > - [CFS（EuroSys 2023）精读](cfs-eurosys2023.md)：同样以 HopsFS 为基线，但路线相反，CFS 去掉代理层，λFS 把代理层做成弹性缓存。
 > - [InfiniFS（FAST 2022）精读](infinifs-fast2022.md)：λFS 论文中的对比对象之一，固定规模的元数据集群。
 > - [Tectonic（FAST 2021）精读](tectonic-fast2021.md)：同属"无状态元数据层 + 分片事务存储"的分离式架构。
+> - [FileScale（SoCC 2023）精读](filescale-socc2023.md)：同样在数据库之上加缓存，但用前缀独占的写回缓存，写也能接近单机 HDFS。
 
 ## 目录
 
