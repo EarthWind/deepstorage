@@ -831,7 +831,7 @@ flowchart LR
 - Wenhao Lv et al. *InfiniFS: An Efficient Metadata Service for Large-Scale Distributed Filesystems*. USENIX FAST 2022. 本仓库精读：[infinifs-fast2022.md](infinifs-fast2022.md)
 - Yiduo Wang et al. *CFS: Scaling Metadata Service for Distributed File System via Pruned Scope of Critical Sections*. EuroSys 2023. 本仓库精读：[cfs-eurosys2023.md](cfs-eurosys2023.md)
 - Hao Guo et al. *SingularFS: A Billion-Scale Distributed File System Using a Single Metadata Server*. USENIX ATC 2023. 本仓库精读：[singularfs-atc2023.md](singularfs-atc2023.md)
-- Jiahao Li et al. *Mantle: Efficient Hierarchical Metadata Management for Cloud Object Storage Services*. SOSP 2025.（并发的服务端解析工作，见[元数据扩展性综述](metadata-scalability.md)）
+- Jiahao Li et al. *Mantle: Efficient Hierarchical Metadata Management for Cloud Object Storage Services*. SOSP 2025.（并发的服务端解析工作，本仓库精读：[mantle-sosp2025.md](mantle-sosp2025.md)）
 - Salman Niazi et al. *HopsFS: Scaling Hierarchical File System Metadata Using NewSQL Databases*. USENIX FAST 2017.
 - Antonios Katsarakis et al. *Hermes: A Fast, Fault-Tolerant and Linearizable Replication Protocol*. ASPLOS 2020.（失效式复制的灵感来源）
 - Bin Fan, Hyeontaek Lim, David G. Andersen, Michael Kaminsky. *Small Cache, Big Effect: Provable Load Balancing for Randomly Partitioned Cluster Services*. SoCC 2011.（例外表规模证明所依赖的定理）

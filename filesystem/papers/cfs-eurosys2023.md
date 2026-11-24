@@ -846,4 +846,4 @@ flowchart LR
 - Cheng Li et al. *Making Geo-Replicated Systems Fast as Possible, Consistent when Necessary*. OSDI 2012.
 - Romain Vaillant et al. *CRDTs for Truly Concurrent File Systems*. HotStorage 2021.
 - CFS POSIX 兼容性测试日志：<https://github.com/cfs-for-review/CFS-for-review>
-- 后续工作 Mantle（SOSP 2025）与其他元数据系统：见[元数据扩展性综述](metadata-scalability.md)
+- 后续工作 Mantle（SOSP 2025）：见 [Mantle 精读](mantle-sosp2025.md)；其他元数据系统见[元数据扩展性综述](metadata-scalability.md)
