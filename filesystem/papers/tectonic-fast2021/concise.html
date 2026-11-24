@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Facebook's Tectonic Filesystem — 精炼解读</title>
+<style>
+:root{--text:#1a1a1a;--bg:#fafaf8;--accent:#2563eb;--muted:#6b7280;--border:#e5e7eb;--code-bg:#f3f4f6}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"PingFang SC","Noto Serif SC",serif;color:var(--text);background:var(--bg);line-height:1.85;padding:2.5rem 1.5rem;max-width:720px;margin:0 auto;font-size:17px}
+h1{font-size:2rem;margin:0 0 .3rem;line-height:1.3}
+h2{font-size:1.35rem;margin:2.8rem 0 .8rem;color:var(--accent);padding-bottom:.4rem;border-bottom:1px solid var(--border)}
+h3{font-size:1.1rem;margin:1.5rem 0 .5rem;color:#333}
+.meta{color:var(--muted);font-size:.9rem;margin-bottom:2.5rem;line-height:1.8}
+.meta a{color:var(--accent);text-decoration:none}
+blockquote{border-left:3px solid var(--accent);padding:.6rem 1.2rem;margin:1.5rem 0;background:#f0f4ff;border-radius:0 8px 8px 0}
+pre{background:var(--code-bg);padding:1rem 1.2rem;border-radius:8px;overflow-x:auto;font-size:.85rem;line-height:1.5;margin:1.5rem 0;border:1px solid var(--border)}
+code{font-family:"SF Mono","Fira Code",monospace;font-size:.9em}
+p{margin:1rem 0}
+strong{color:#111}
+table{width:100%;border-collapse:collapse;margin:1.5rem 0;font-size:.93rem}
+td,th{border:1px solid var(--border);padding:.6rem .9rem;text-align:left}
+th{background:#f9fafb;font-weight:600}
+.summary-box{background:linear-gradient(135deg,#f0f4ff,#faf5ff);padding:1.5rem;border-radius:12px;margin:1.5rem 0}
+.summary-box h3{margin:0 0 .5rem;color:var(--accent)}
+.summary-box ul{margin:.3rem 0 0 1.2rem}
+ol.innov{margin:1rem 0 1rem 1.3rem}
+ol.innov li{margin:.9rem 0}
+.golden{font-size:1.25rem;font-weight:600;color:var(--accent);text-align:center;padding:2rem 1rem;border-top:2px solid var(--accent);border-bottom:2px solid var(--accent);margin:2.5rem 0;line-height:1.5}
+@media(max-width:600px){body{font-size:16px;padding:1.2rem 1rem}h1{font-size:1.5rem}}
+</style>
+<!-- KaTeX -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous"
+  onload="renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}]})"></script>
+<!-- Mermaid -->
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js" integrity="sha384-WmdflGW9aGfoBdHc4rRyWzYuAjEmDwMdGdiPNacbwfGKxBW/SO6guzuQ76qjnSlr" crossorigin="anonymous"></script>
+<script>mermaid.initialize({startOnLoad:true,theme:'default',securityLevel:'loose'});</script>
+</head>
+<body>
+
+<h1>Tectonic：一个集群装下整个数据中心</h1>
+<div class="meta">
+论文：Satadru Pan et al. <em>Facebook's Tectonic Filesystem: Efficiency from Exascale</em>. USENIX FAST 2021<br>
+链接：<a href="https://www.usenix.org/conference/fast21/presentation/pan">会议页面</a> · <a href="fast21-pan.pdf">本地 PDF</a> · 本仓库：<a href="academic.html">学术版</a> / <a href="storytelling.html">故事版</a> / <a href="deep-read.md">逐章精读</a> / <a href="README.md">图解</a><br>
+代码状态：❌ 本文未提供公开代码（Meta 内部系统；依赖的 RocksDB、CacheLib 开源，ZippyDB 未开源）<br>
+风格：concise · 数字均出自论文并标注章节
+</div>
+
+<pre class="mermaid">
+flowchart LR
+    subgraph OLD["Before: storage constellation"]
+        HS["Haystack<br/>hot blobs, 3x replica<br/>effective 5.3x"]
+        F4["f4<br/>warm blobs, RS 10,4<br/>effective 2.8x"]
+        HD["Tens of HDFS clusters<br/>warehouse<br/>single NameNode each"]
+    end
+    subgraph NEW["Tectonic: one cluster per datacenter"]
+        CL["Client Library<br/>per-call config + rate limiter"]
+        MS["Metadata Store<br/>Name / File / Block<br/>hash-sharded on ZippyDB"]
+        CS["Chunk Store<br/>flat chunks, EB scale"]
+        CL --> MS
+        CL --> CS
+    end
+    HS --> CL
+    F4 --> CL
+    HD --> CL
+    NEW -.-> OUT["Result<br/>warehouse clusters 10x fewer<br/>blob 5.3x to 2.8x<br/>same performance"]
+</pre>
+
+<div class="summary-box">
+<h3>核心摘要</h3>
+<ul>
+<li><strong>做什么</strong>：Facebook 的数据中心级 EB 级多租户文件系统，替代 Haystack、f4 和数十个 HDFS 集群。</li>
+<li><strong>怎么做</strong>：扁平 chunk 存储 + 三层哈希分片元数据 + TrafficGroup 资源管理 + 客户端逐调用定制读写。</li>
+<li><strong>效果</strong>：数仓集群数降至 1/10；Blob 有效复制因子 5.3× → 约 2.8×；性能与专用系统持平。</li>
+<li><strong>适用</strong>：HDD 上的大容量、高吞吐负载（Blob、数仓）；不适合 SSD 级低延迟 KV 与无依赖的引导服务。</li>
+</ul>
+</div>
+
+<h2>为什么要做</h2>
+
+<p>核心问题是资源孤岛。Haystack 受 IOPS 限制，只能多买盘，有效复制因子从理想的 3.6× 涨到 5.3×；f4 的 IOPS 富余却借不出去（§2.1）。HDFS 单 NameNode 限制集群规模，一个数据中心要开数十个集群，数据集在集群间做二维装箱（§2.2）。</p>
+
+<p>论文的目标是三件事：</p>
+
+<blockquote>"scaling to exabyte-scale, providing performance isolation between tenants, and enabling tenant-specific optimizations." —— §1</blockquote>
+
+<h2>关键创新</h2>
+
+<ol class="innov">
+<li><strong>扁平 Chunk Store，持久性按 block 选。</strong>存储节点只认 chunk，不知道 block 和文件，容量随节点数线性扩展（§3.2）。每个 block 独立选择 RS(r,k) 或副本，chunk 分散到不同机架。关键在于把"怎么写盘"从文件系统逻辑中剥离，为租户定制留出空间。</li>
+
+<li><strong>三层元数据，各层哈希分片。</strong>Name（目录）、File（文件 → block）、Block（block → 磁盘）三层分离，分别按 dir_id、file_id、blk_id 哈希分片，存于 ZippyDB（Table 1）。与 ADLS 的范围分区相比，哈希打散了同一子树的访问，约 2/3 落在 Block 层的元数据操作也均匀分布。代价是只有分片内事务：同目录操作强一致，跨目录 move 非原子。</li>
+
+<li><strong>按 TrafficGroup 管资源，而不是按应用。</strong>容量按租户硬配额；IOPS 与元数据 QPS 按每集群约 50 个 TrafficGroup 分配，分 Gold / Silver / Bronze 三档（§4.1）。空闲资源按"本组 → 同租户 → 其他租户"借出，客户端做全局限流，存储节点用 WRR 加三项 Gold 保护措施做本地调度。核心是降低管理基数，不追求最优公平。</li>
+
+<li><strong>客户端驱动，逐调用配置写路径。</strong>数仓整块缓冲后做 RS(9,6)，先向 19 个节点发预留请求，写给最先应答的 15 个，14 个成功即确认（§5.1）。Blob 走三副本 quorum append，先把块大小 S 提交到元数据再确认，保证 S 之前每个字节至少有两份；seal 后转码为 RS(10,4)（§5.2）。同一系统，两种写法，各自对齐原专用系统的性能。</li>
+</ol>
+
+<p>存储开销对比（RS($r$,$k$) 开销为 $\frac{r+k}{r}$）：RS(9,6) 约 1.67×，RS(10,4) 为 1.4×，三副本为 3×。</p>
+
+<h2>核心数据</h2>
+
+<table>
+<tr><th>指标</th><th>Baseline</th><th>Tectonic</th><th>出处</th></tr>
+<tr><td>数仓集群数</td><td>每个数据中心数十个 HDFS 集群</td><td>降至 1/10</td><td>§1</td></tr>
+<tr><td>Blob 有效复制因子</td><td>Haystack 5.3×</td><td>约 2.8×</td><td>§2.1</td></tr>
+<tr><td>数仓峰值磁盘时间</td><td>独立部署供给 0.51，峰值需求 0.60，需超配约 17%</td><td>合并后合计需求 ≤ 0.72 / 供给 1.00</td><td>Table 3</td></tr>
+<tr><td>数仓 72 MB 整块写 P99</td><td>无 hedging</td><td>改善约 20%（80% 负载）</td><td>Figure 3a</td></tr>
+<tr><td>Blob 读写延迟</td><td>Haystack</td><td>相当</td><td>Figure 3b/3c</td></tr>
+</table>
+
+<p>最有说服力的是 Table 3：数仓三个日峰值（0.60 / 0.54 / 0.57）都超过其独立供给 0.51，而 Blob 峰值需求只有 0.11–0.14，远低于其 0.49 的供给。合并的收益来自负载形态互补，不是单项优化。集群规模（Table 2）：1590 PB 容量、107 亿文件、150 亿 block、4208 个存储节点。</p>
+
+<h2>设计取舍</h2>
+
+<p>论文的总原则是"prioritizes simplicity over efficiency"（§6.4），只在两处为性能接受复杂度。一是限制重建读：RS(10,4) 的重建读需要约 10 倍 IO，过载节点会触发更多重建读并形成"重建风暴"，系统把重建读限制在全部读的 10% 以内，而不是改用每次都要重建的条带化布局。二是客户端直连存储节点，不经过前端代理，省掉每秒数 TB 数据的额外一跳；代价是客户端库的缺陷会进入应用二进制。</p>
+
+<p>两条生产教训（§6.6）：Chunk Store 第一版按 block group 编码以节省元数据，结果 5% 节点不可用就让 80% 的 block group 无法写入，最终改为逐 block 放置；规模上去后内存数据损坏成为常态，所有数据变换之后都要用逆变换还原并比对校验和。</p>
+
+<h2>与相关系统对比</h2>
+
+<table>
+<tr><th>系统</th><th>元数据</th><th>与 Tectonic 的关键差异</th></tr>
+<tr><td>HDFS / GFS</td><td>单节点，内存</td><td>单集群止于数十 PB；Tectonic 单集群为 EB 级</td></tr>
+<tr><td>ADLS / HopsFS</td><td>分层分片，保留目录局部性</td><td>相关目录同分片，易出现子树热点；Tectonic 哈希打散</td></tr>
+<tr><td>Ceph</td><td>按对象哈希定位</td><td>故障时映射更新开销大、缺乏受控迁移；Tectonic 显式记录 chunk 位置</td></tr>
+<tr><td>Colossus</td><td>论文称基于 Spanner</td><td>有全局一致数据库；Tectonic 只有分片内事务</td></tr>
+</table>
+
+<h2>局限</h2>
+
+<ul style="margin-left:1.2rem">
+<li><strong>作者自述</strong>：元数据延迟高于 HDFS（跨层网络调用），数仓只好把串行 rename 改为并行；哈希分片导致无递归 list、无 du，目录用量靠定期汇总（§6.5）。</li>
+<li><strong>作者自述</strong>：远程访问需经同机房无状态代理；SSD 级低延迟 KV 负载尚未覆盖（§6.4、§6.7）。</li>
+<li><strong>笔者判断</strong>：评估几乎全部来自单个生产集群三天的观测，没有同硬件的受控对比；19/15/14、10% 重建读上限等参数缺乏敏感性分析，代码不公开也无法复现。</li>
+<li><strong>笔者判断</strong>：跨目录 move 非原子，依赖"rename 即提交"的通用分析框架需要改造。</li>
+</ul>
+
+<div class="golden">简单的底座，聪明的客户端，粗粒度的公平：EB 级系统靠的是取舍，不是新算法。</div>
+
+</body>
+</html>
