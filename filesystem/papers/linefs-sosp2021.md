@@ -10,7 +10,7 @@
 >
 > 精读日期：2026-11-23。文中**数字、表格与机制描述均摘自论文原文**（标注所在章节）；标注"解读"的段落是本文作者的分析与推论，不是论文原话。图 4、图 6、图 7、图 8 中没有数值标注的柱和折线，文中给出的是**读图估计**，误差约 ±5%。
 >
-> 相关文档：[新硬件综述中的 LineFS 小节](new-hardware.md#4-linefs-efficient-smartnic-offload-of-a-distributed-file-system-with-pipeline-parallelism)、[DPFS（SYSTOR 2023）精读](dpfs-systor2023.md)、[Fisc（FAST 2023）精读](fisc-fast2023.md)（另两条 DPU 文件系统路线）、[DAOS（SCFA 2020）精读](daos-scfa2020.md)（同为 Optane 持久内存时代的系统）。
+> 相关文档：[Assise（OSDI 2020）精读](assise-osdi2020.md)（LineFS 的基础系统）、[新硬件综述中的 LineFS 小节](new-hardware.md#4-linefs-efficient-smartnic-offload-of-a-distributed-file-system-with-pipeline-parallelism)、[DPFS（SYSTOR 2023）精读](dpfs-systor2023.md)、[Fisc（FAST 2023）精读](fisc-fast2023.md)（另两条 DPU 文件系统路线）、[DAOS（SCFA 2020）精读](daos-scfa2020.md)（同为 Optane 持久内存时代的系统）。
 
 ## 目录
 
