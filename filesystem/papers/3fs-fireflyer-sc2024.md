@@ -945,4 +945,4 @@ flowchart LR
 - Robbert van Renesse, Fred B. Schneider. *Chain Replication for Supporting High Throughput and Availability*. OSDI 2004.
 - Jingyu Zhou et al. *FoundationDB: A Distributed Unbundled Transactional Key Value Store*. SIGMOD 2021.
 - 本仓库 3FS 源码调研：[project/3fs/README.md](../project/3fs/README.md)（元数据、数据路径、一致性、高可用、运维、性能、评估）
-- 本仓库相关精读：[FalconFS（NSDI 2026）](falconfs-nsdi2026.md)、[Tectonic（FAST 2021）](tectonic-fast2021/README.md)、[InfiniFS（FAST 2022）](infinifs-fast2022.md)、[CFS（EuroSys 2023）](cfs-eurosys2023.md)、[Tectonic-Shift（ATC 2023）](tectonic-shift-atc2023.md)
+- 本仓库相关精读：[FalconFS（NSDI 2026）](falconfs-nsdi2026.md)、[Tectonic（FAST 2021）](tectonic-fast2021/deep-read.md)、[InfiniFS（FAST 2022）](infinifs-fast2022.md)、[CFS（EuroSys 2023）](cfs-eurosys2023.md)、[Tectonic-Shift（ATC 2023）](tectonic-shift-atc2023.md)
