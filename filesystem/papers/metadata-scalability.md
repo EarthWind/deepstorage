@@ -227,15 +227,16 @@ POSIX 语义要求逐级检查路径上每一级目录的存在性与权限。�
 
 ### 2.11 SwitchFS: Asynchronous Metadata Updates for Distributed Filesystems with In-Network Coordination（EuroSys 2026）
 
-- **作者/机构**：Jingwei Xu、Mingkai Dong、Qiulin Tian、Ziyi Tian、Tong Xin、Haibo Chen，上海交通大学 IPADS（早期 arXiv 版本名为 AsyncFS）
+- **作者/机构**：Jingwei Xu、Mingkai Dong（通讯作者）、Qiulin Tian、Ziyi Tian、Tong Xin、Haibo Chen，上海交通大学 IPADS（早期 arXiv 版本名为 AsyncFS；第一作者同为 FalconFS 一作）
 - **会议/年份**：ACM EuroSys 2026
 - **链接**：https://dl.acm.org/doi/10.1145/3767295.3769349 ；arXiv: https://arxiv.org/abs/2410.08618
-- **解决的问题**：同步元数据更新（如 create 需同步更新父目录）在动态倾斜负载下造成目录争用与长尾延迟。
+- **解决的问题**：同步元数据更新（如 create 需同步更新父目录）带来两难：P/C 聚合（InfiniFS）有目录热点，P/C 分离（CFS）每次 create 要跨服务器协调；且同一目录的并发更新在父目录上串行。盘古负载中目录更新 30.76%、目录读仅 4.19%，至少约 86% 的目录更新之后不会被立刻读。
 - **核心设计**：
-  - **异步元数据更新**：操作提前返回，目录更新**推迟到读取时**批量应用（batching + consolidation），既隐藏延迟又摊薄开销；关键在于仍维持同步 POSIX 语义可见性。
-  - **可编程交换机协调**：用 programmable switch 的片上资源跟踪目录状态（哪些目录有未应用的 delta），以近乎零开销做全局协调。
-- **关键实验结果**：显著降低目录争用下的延迟并提升吞吐（具体数字待确认，需查论文正文）。
-- **局限性**：依赖 P4 可编程交换机硬件；交换机资源极有限，状态管理复杂；部署门槛高。
+  - **异步元数据更新**：按 (pid, name) 哈希打散所有元数据；create/delete/mkdir/rmdir 只在目标所在服务器执行，父目录修改记入本机 change-log 后即返回（1 RTT）；statdir/readdir 遇到散乱目录时从所有服务器聚合；聚合前按可交换性合并（增量任意序、时间戳取最大、同名项 FIFO），满 MTU 或空闲时主动推送。rename 仍走分布式事务 + 集中协调者。
+  - **可编程交换机协调**：Tofino 上的网内脏集合记录散乱目录的 49 位指纹，组相联 10 级 × 2^17 个 32 位寄存器（131 万指纹，5 MiB）；插入成功后由交换机多播回包，溢出时回退为同步更新；附录论证可串行化与实时顺序。
+- **关键实验结果**：单大目录中 create/delete/mkdir/rmdir 随服务器线性扩展（基线不扩展）；吞吐最高为 E-InfiniFS 的 13.34×，延迟比 E-CFS 低 57.3%；change-log 合并让 create P99 从 173 µs 降到 22 µs；突发负载下基线吞吐降 47%–72%，SwitchFS 稳定；真实负载端到端吞吐比 CephFS/E-InfiniFS/E-CFS 提升 21.1×/1.1×/0.3×（"提升幅度"口径）。
+- **局限性**：依赖 Tofino 交换机（占 5 MiB 寄存器）且交换机是单点故障，故障与重配置需全局停服聚合；大量写入后首次 statdir 最多约 500 µs，平时 statdir 也慢 28.6%；只测到 16 台服务器、单交换机。协议本身可退化为所属服务器跟踪（延迟上升 23%–107%，吞吐降约 10%）。
+- **逐节精读**：[switchfs-eurosys2026.md](switchfs-eurosys2026.md)
 - **设计启示**：硬件不必照搬，但"**目录统计/时间戳等派生元数据延迟到读时物化**"的思想可直接借鉴：create/unlink 只写 delta 记录，`stat`/`readdir` 时合并——把写热点转化为读时少量额外工作。
 
 ---
@@ -266,7 +267,7 @@ POSIX 语义要求逐级检查路径上每一级目录的存在性与权限。�
 | HMFS (SoCC'25) | 按目录分区（同 InfiniFS）；PM 哈希索引 + 目录内链表 | 客户端缓存 + hash 点查 | 8/16 字节原子写 + 有序写，按需恢复；rename 日志 + 2PC | PM 哈希表（DASH） | stat 为 SingularFS 1.8×；120 亿文件 13.4/34.7 Mops/s |
 | FalconFS (NSDI'26) | 文件按名 hash 分区；目录 namespace 惰性全复制 | 服务端本地解析（stateless client） | 协调者 2PL + 2PC，广播失效 dentry 副本 | 定制 PostgreSQL（每 MNode） | 万卡 NPU 生产 1 年；训练吞吐至 12.81× |
 | MesaFS (EuroSys'26) | 按目录分区（同 InfiniFS）；目录间哈希 + 目录内 WO-HTree | 客户端缓存 + 版本号惰性失效 | 有序写 + 父目录延迟持久化 + 临时 backpointer；目录 rename 集中到服务器 0 | MesaKV（SSD，单页原子写） | 62.0–95.1% 裸 SSD 性能 |
-| SwitchFS (EuroSys'26) | 常规分区 + 交换机跟踪目录状态 | 常规 | 异步 delta，读时合并 | —（协调面创新） | 争用下延迟/吞吐显著改善（待确认） |
+| SwitchFS (EuroSys'26) | 按 (pid, name) 哈希打散（P/C 分离）+ 交换机跟踪散乱目录 | 客户端目录缓存 + 失效列表 | 父目录修改记入本地 change-log，读时聚合合并；rename 分布式事务 | RocksDB（异步写）+ WAL | 单大目录线性扩展；端到端提升 0.3–21.1× |
 
 ---
 
