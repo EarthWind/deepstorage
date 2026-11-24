@@ -56,7 +56,7 @@ POSIX 语义要求逐级检查路径上每一级目录的存在性与权限。�
 
 粗略可分为四条并行路线：
 
-1. **"下沉到事务存储"路线**（Tectonic 2021 → λFS 2023 → FileScale 2023，工业上还有 3FS/FoundationDB）：元数据服务无状态化，把分区、事务、复制全部交给成熟的分片 KV / 分布式数据库。工程确定性最高，天花板取决于底层数据库。
+1. **"下沉到事务存储"路线**（Tectonic 2021 → λFS 2023 → FileScale 2023，工业上还有 3FS/FoundationDB）：把持久化、跨分区事务、复制交给成熟的分片 KV / 分布式数据库；元数据服务要么无状态（Tectonic、3FS），要么只持有可丢弃或可重放的缓存（λFS 的读缓存、FileScale 的前缀独占写回缓存）。工程确定性最高，天花板取决于底层数据库。
 2. **"精细解耦 + 裁剪临界区"路线**（InfiniFS 2022 → CFS 2023 → Mantle 2025 → HMFS 2025）：不依赖通用分布式事务，通过元数据拆分、布局聚合、集中式轻量索引，把常见操作压成单分片/单 RPC。学术性能最强，复杂度也最高。
 3. **"新硬件纵向扩展"路线**（SingularFS 2023 → MesaFS 2026，含 HMFS 的 PM 部分）：用 PM/RDMA/NVMe 把单机 MDS 推到十亿级，回避分布式问题；关注点从"怎么分"转为"单机引擎的每操作 I/O 次数"。
 4. **"负载特化与网内协同"路线**（FalconFS 2026、SwitchFS 2026、Fletch）：针对 AI 训练等特定负载重排职责（服务端解析、异步目录更新），或借助可编程交换机做协调/缓存。
@@ -149,16 +149,18 @@ POSIX 语义要求逐级检查路径上每一级目录的存在性与权限。�
 
 ### 2.6 FileScale: Fast and Elastic Metadata Management for Distributed File Systems（SoCC 2023）
 
-- **作者/机构**：Gang Liao、Daniel J. Abadi，University of Maryland
-- **会议/年份**：ACM SoCC 2023
+- **作者/机构**：Gang Liao（署名 ByteDance Infrastructure System Lab，工作完成于 UMD 读博期间）、Daniel J. Abadi（University of Maryland）
+- **会议/年份**：ACM SoCC 2023（论文集第 459–474 页）
 - **链接**：https://dl.acm.org/doi/10.1145/3620678.3624784 ；PDF: http://www.cs.umd.edu/~abadi/papers/filescale.pdf ；代码：https://github.com/umd-dslam/FileScale
 - **解决的问题**：用分布式数据库（DDBMS）存元数据可以扩展（HopsFS/CalvinFS 路线），但在小规模部署时比单机内存 NameNode 慢一个数量级——扩展性与小规模性能不可兼得。
 - **核心设计**：
-  - **三层架构（three-tier）**：在 HDFS 上实现——内存缓存层（保持单机快路径）→ 中间层 → shared-nothing DDBMS 持久层；小规模时请求几乎全部命中内存层，性能接近原生 NameNode；规模增长时由 DDBMS 水平扩展。
-  - **事务/一致性**：跨分区操作（如 rename）由 DDBMS 的分布式事务保证 ACID。
-  - **存储引擎**：shared-nothing 分布式数据库（基于确定性数据库技术，Abadi 团队 Calvin 谱系，具体实现待确认）。
-- **关键实验结果**：小规模下与单机 HDFS NameNode 性能相当；元数据规模增长时呈线性扩展。
-- **局限性**：三层缓存一致性协议复杂；写多负载下内存层收益下降；基于 Java/HDFS 生态。
+  - **三层架构（three-tier）**：在 HDFS 3.3.0 内实现（约 4 万行）——**代理层**用 ZooKeeper 中的挂载表按最长路径前缀路由（proxy 模式或客户端 watch 模式）；**缓存层**每个 NameNode 独占若干前缀，作写回缓存，更新写入远程 WAL 确认后即可见，再异步批量刷入数据库；**数据库层**保存全部元数据。数据放得进缓存时关键路径上没有数据库往返，性能接近原生 NameNode。
+  - **数据模型**：14 张表，inodes 以完整路径 (pname, name) 为主键，递归 chmod/delete 用前缀匹配一条 SQL 完成；代价是目录 rename 要改写整棵子树的主键（删除再插入）。
+  - **事务/一致性**：单分区请求在所属 NameNode 内串行；跨分区请求（move、高层递归操作）先把相关脏数据写回并逐出缓存，再由 DDBMS 分布式事务执行。
+  - **存储引擎**：可插拔，已支持 VoltDB（社区版）和 Apache Ignite；并非 Calvin。
+- **关键实验结果**：单节点各操作与 HDFS 相当（16 线程 10 万次 create：HopsFS 479、HDFS 6,803、FileScale 6,865 ops/s）；1→32 个 NameNode、3 个数据库节点时近似线性扩展；但 1% 的跨分区事务就让单分区 chmod 吞吐从 754 降到 238 ops/s，10⁵ 文件全脏的跨分区 move 约 98.6 s。
+- **局限性**：跨分区操作代价高且会拖累同数据的单分区请求；路径主键让 rename 为 O(子树)；缓存层无热备，故障接管要重放日志；热点前缀只能迁移不能复制；基于 Java/HDFS 生态。
+- **逐节精读**：[filescale-socc2023.md](filescale-socc2023.md)
 - **设计启示**：多数新系统从小集群起步——"小规模不为扩展性交税"值得作为元数据服务的显式设计目标：单节点内存快路径 + 可插拔的分布式持久层，规模化时平滑切换，而不是一开始就承担分布式事务开销。
 
 ### 2.7 Mantle: Efficient Hierarchical Metadata Management for Cloud Object Storage Services（SOSP 2025）
@@ -256,7 +258,7 @@ POSIX 语义要求逐级检查路径上每一级目录的存在性与权限。�
 | CFS (EuroSys'23) | 属性与 namespace 分层：TafDB（按父 id 范围分区）+ FileStore（按 id 哈希） | 客户端逐级 lookup，单级单分片 | 同目录文件 rename 单分片快路径；其余 Renamer 加锁 + 2PC | TafDB + FileStore（RocksDB） | 生产 3 年；50 节点 1.22–4.10× vs InfiniFS |
 | SingularFS (ATC'23) | 不分区（单 MDS，机内 hybrid inode partition：NUMA 间按目录组、NUMA 内按键哈希） | 逐级 lookup + 客户端目录元数据缓存 | 日志（2 个 inode）+ 严格 2PL，无分布式协调 | P-Masstree on Optane PM + RDMA | 每 NUMA 17.5 亿文件；单机 create 8.36M ops/s |
 | λFS (ASPLOS'23) | 按父目录一致性 hash 到固定 deployment + 函数内缓存 | 函数内缓存解析，未命中查 DB | NDB 事务 + INV/ACK 缓存失效 | MySQL NDB Cluster | 弹性伸缩；读吞吐 8–31× HopsFS，写更慢 |
-| FileScale (SoCC'23) | 三层：内存缓存 + DDBMS shared-nothing 分区 | 内存层快路径 | DDBMS 分布式 ACID 事务 | 分布式数据库（Calvin 谱系，待确认） | 小规模≈单机 HDFS；线性扩展 |
+| FileScale (SoCC'23) | 三层：挂载表前缀路由 + 前缀独占写回缓存 + DDBMS | 缓存内按各级前缀并行哈希查找 | 单分区本地串行；跨分区刷脏后交 DDBMS 事务 | VoltDB / Apache Ignite | 小规模≈单机 HDFS；线性扩展 |
 | Mantle (SOSP'25) | TafDB 分片（全量）+ 每 namespace 单机 IndexNode（目录骨架） | IndexNode 单 RPC lookup | 环检测 offload 至 IndexNode；delta 更新 | TafDB | 100 亿对象/namespace；1.8M lookup/s；生产 2 年 |
 | HMFS (SoCC'25) | 无序（hash）索引 + 对象间链接维护目录语义 | hash 点查 | 待确认 | PM 上无序索引 + 链接结构 | 显著超有序索引方案（数字待确认） |
 | FalconFS (NSDI'26) | 文件按名 hash 分区；目录 namespace 惰性全复制 | 服务端本地解析（stateless client） | 协调者 2PL + 2PC，广播失效 dentry 副本 | 定制 PostgreSQL（每 MNode） | 万卡 NPU 生产 1 年；训练吞吐至 12.81× |

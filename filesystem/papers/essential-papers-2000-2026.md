@@ -104,7 +104,7 @@
 | 2022 | InfiniFS | 清华 | FAST | 见核心必读 #13 |
 | 2023 | SingularFS: A Billion-Scale Distributed File System Using a Single Metadata Server | 清华 | ATC | 单元数据服务器 + PM/RDMA 达到十亿文件级 |
 | 2023 | λFS: Scalable and Elastic Distributed File System Metadata Service using Serverless Functions | GMU 等 | ASPLOS | 元数据服务 serverless 化，弹性伸缩 |
-| 2023 | FileScale: Fast and Elastic Metadata Management for Distributed File Systems | UMD | SoCC | HDFS 元数据的弹性分片与在线迁移 |
+| 2023 | FileScale: Fast and Elastic Metadata Management for Distributed File Systems | UMD | SoCC | HDFS 元数据三层架构：前缀独占写回缓存 + DDBMS 跨分区事务，小规模≈单机、可线性扩展 |
 | 2025 | Mantle: Efficient Hierarchical Metadata Management for Cloud Object Storage | 中科大 / Baidu / 清华 | SOSP | 对象存储之上的层次命名空间与目录语义 |
 | 2025 | HMFS: Decoupling Directory Semantics from Metadata Indexing | 清华 | SoCC | 目录语义与索引分离，路径解析与 rename 的新折中 |
 | 2026 | MesaFS: An I/O-Efficient Metadata Service for Distributed File Systems | 清华 | EuroSys | 面向元数据 I/O 效率的服务端布局 |
