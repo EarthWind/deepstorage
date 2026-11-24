@@ -337,7 +337,7 @@
 | Famfs | 内核补丁 + FAST 2025 poster | CXL 共享内存 | 多主机共享挂载的 fs-dax FS，单 Master + append-only 元数据日志 | 硬件（CXL switch 共享内存）未普及；代码开源，属前瞻布局 |
 | 3FS | 开源技术报告 2025（非评审） | NVMe 池 + RDMA | FoundationDB 元数据 + CRAQ 链复制 + USRBIO 零拷贝直读，AI workload 特化 | 开源可部署，工业验证充分；数字为自报 |
 | DPC（客户端） | ICPP 2024 | DPU | DFS 客户端卸载至 DPU | 论文级原型 |
-| SwitchFS | EuroSys 2026 | 可编程交换机 | 网内协调的异步元数据更新 | 依赖 P4 交换机，原型阶段 |
+| SwitchFS | EuroSys 2026 | 可编程交换机 | 网内协调的异步元数据更新（精读：[switchfs-eurosys2026.md](switchfs-eurosys2026.md)） | 依赖 P4 交换机，交换机单点故障，原型阶段 |
 | VAST Data | 无论文（白皮书） | NVMe-oF + SCM | DASE 分列共享架构 | 商业闭源，标注：无同行评审论文 |
 
 ---
