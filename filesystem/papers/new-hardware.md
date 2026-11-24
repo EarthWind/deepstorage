@@ -75,30 +75,40 @@
 
 ## 3. Octopus+: An RDMA-Enabled Distributed Persistent Memory File System
 
-- **期刊**：ACM Transactions on Storage, Vol.17 No.3, 2021（ATC 2017 Octopus 的扩展期刊版；2020 年后版本收录于此）
-- **作者/机构**：Youyou Lu、Jiwu Shu 等（清华大学存储研究组）
-- **链接**：https://dl.acm.org/doi/10.1145/3448418 ；PDF https://storage.cs.tsinghua.edu.cn/papers/tos21octopus.pdf/
-- **目标硬件**：Intel Optane DC PMem + RDMA（相比 ATC'17 版本，TOS'21 在真实 Optane 上重新评估并扩展了复制机制）
+- **期刊**：ACM Transactions on Storage, Vol.17 No.3, Article 19, 2021 年 8 月（ATC 2017 Octopus 的扩展期刊版）
+- **作者/机构**：Bohong Zhu、Youmin Chen、Qing Wang、Youyou Lu、Jiwu Shu（清华大学存储研究组）
+- **链接**：https://doi.org/10.1145/3448418 ；PDF https://storage.cs.tsinghua.edu.cn/papers/tos21octopus.pdf
+- **精读**：[octopus-plus-tos2021.md](octopus-plus-tos2021.md)
+- **目标硬件**：Intel Optane DCPMM + 100 Gbps EDR InfiniBand（会议版在 DRAM 上用共享内存模拟 PM，56 Gbps FDR）
 
 ### 核心设计
 
-- **紧耦合 NVM 与 RDMA**：文件系统镜像本身作为**共享持久内存池**直接暴露给 RDMA，消除"文件系统页缓存 ↔ 网络 mbuf"的重复拷贝。
-- **数据路径**：client-active 模式——大 IO 由客户端用单边 RDMA READ/WRITE 直接读写服务端 PM 数据区，把负载从服务端 CPU 转移到客户端与网络（server 只做元数据裁决）。
-- **元数据路径**：self-identified RPC（携带发送方标识的双边 verbs + 立即通知）；跨服务器操作（如 rename）用 collect-dispatch 分布式事务：本地日志 + RDMA 单边写远端完成分发，降低分布式事务的锁与日志开销。
-- 目录集中于 directory metadata server，文件按 hash 分布到各服务器。
+- **紧耦合 NVM 与 RDMA**：每台服务器 NVM 的数据区用 `ibv_reg_mr` 注册，合起来构成**共享持久内存池**；不堆叠本地文件系统，一次远程 IO 的拷贝从 GlusterFS 的 7 次降到 4 次。元数据区保持私有，只经 RPC 访问。
+- **数据路径**：client-active 模式——客户端先经 RPC 拿到数据地址，再用单边 RDMA READ/WRITE 直接读写服务端 PM，用一次额外往返把数据搬运从服务器 CPU 转给客户端。每文件读写锁由服务器用 CPU CAS 加锁、客户端用 RDMA CAS 解锁。
+- **元数据路径**：自识别 RPC——用 `write_with_imm`（单边写 + 消耗一个接收请求产生通知），立即数携带客户端 `node_id` 与接收缓冲区偏移，服务器无需扫描缓冲区；跨服务器操作用 collect-dispatch 事务：协调者收集读写集后只在本地记 redo 日志，再用 RDMA write 分发写集、RDMA CAS 远程解锁，参与者不记日志。
+- **目录组织（期刊版新增）**：全部目录集中在一台目录元数据服务器（DMS）上本地解析，文件按 `hash(父目录 ID, 文件名)` 分布到数据服务器；会议版是目录和文件全哈希，N 层路径要 N 次 RPC。每个文件的数据不跨服务器，用 NVM 上的跳表索引。
+- **复制与一致性（期刊版新增）**：元数据用操作日志复制（在本地日志阶段同步 RDMA 写到备份，备份异步回放）；数据由客户端写所有副本。DDIO 下 RDMA 写只到远端 LLC，因此每次数据写后追加一次 RPC 让服务器 flush；数据 COW + 元数据事务保证故障原子性。
 
 ### 关键实验结果
 
-- 在 Optane PMem 上大 IO 接近原始硬件带宽；元数据操作与数据 IO 比 GlusterFS、NFS、Ceph 等高出一到多个数量级（具体倍数随操作类型不同）。
+- 对比对象只有 memGlusterFS（EXT4-DAX + RDMA）和 NVFS（NVM/RDMA 优化的 HDFS）。
+- Mkdir 软件延迟 6.3 µs（memGlusterFS 363 µs）；单服务器读/写 11.9 / 5.7 GB/s（NVM 带宽的 59% / 90%）；6 台服务器聚合读约 63.5 GB/s、写约 29.5 GB/s。
+- 元数据：6 台服务器时 Stat 约 190 万、Mknod 约 140 万 ops/s，但 Mkdir 只有约 5.5 万 ops/s 且不随服务器数扩展；元数据延迟 42～103 µs，比对手低一个数量级以上。
+- 自识别 RPC 在 16 B 时 4.1 Mops/s，高于 eRPC、LITE、DaRPC（均关闭批处理）。
+- 论文多处"两个数量级"在图上只有约 30～60 倍，详见精读文档 §8。
 
 ### 局限
 
-- hash 分布 + 单一目录服务器的元数据设计扩展性有限（非其研究重点）；无副本容错的完整故事（扩展版才补充复制）；Optane 停产同样影响复现。
+- 所有目录在单台 DMS 上，目录操作不扩展；单个文件不跨服务器，带宽和容量受限于一台服务器。
+- 分发阶段与日志复制的单边写如何远程持久、客户端崩溃后锁如何释放、故障检测与成员管理都没有说明；未评估故障切换。
+- 期刊版删去了会议版中的 Crail 对比和 collect-dispatch 对比 2PC 的消融实验。
+- Optane 停产影响复现。
 
 ### 设计启示
 
-- "大 IO 单边 RDMA 直达、元数据小 RPC 双边"的路径分化可直接借鉴：存储节点的大块追加/读取走 RDMA 单边或 RDMA-based RPC 零拷贝，元数据操作保持小消息 RPC。
+- "大 IO 单边 RDMA 直达、元数据小 RPC"的路径分化可直接借鉴：存储节点的大块追加/读取走 RDMA 单边或 RDMA-based RPC 零拷贝，元数据操作保持小消息 RPC。
 - client-active 负载转移思想与"客户端直连存储节点、控制面不在 IO 路径"的分离式架构原则一致，可进一步把 EC 编码、CRC 计算放在客户端。
+- 单边写落在 DDIO 的 LLC 里而非持久介质，这个问题在换成 NVMe 或 CXL 内存后依然存在，远程持久性需要显式的 flush 或提交协议。
 
 ---
 
@@ -329,7 +339,7 @@
 | 论文 | 会议/年份 | 目标硬件 | 核心思路 | 现实可用性 |
 |---|---|---|---|---|
 | Assise | OSDI 2020 | 客户端本地 PM + RDMA | 客户端 PM 作线性一致可恢复缓存，操作粒度一致性，链式复制，亚秒 failover | Optane 停产，思想可迁移至低延迟 SSD/电容 DRAM；代码开源 |
-| Octopus+ | ACM TOS 2021 | PM + RDMA | FS 镜像即共享持久内存池，零拷贝；大 IO 单边 RDMA client-active，自识别 RPC + collect-dispatch 事务 | Optane 停产；RDMA 路径设计仍是范式级参考 |
+| Octopus+ | ACM TOS 2021 | PM + RDMA | FS 镜像即共享持久内存池，服务端零软件拷贝；client-active 单边 RDMA 数据 IO，自识别 RPC + collect-dispatch 事务，目录集中到 DMS | Optane 停产；RDMA 路径设计仍是范式级参考 |
 | LineFS | SOSP 2021（Best Paper） | BlueField SmartNIC + PM | DFS 分解为 stage，流水线并行 offload 后台任务到 wimpy ARM 核，消除主机干扰 | BlueField 可得，PM 依赖是障碍；流水线 offload 方法论通用 |
 | DPFS | SYSTOR 2023 | BlueField-2 DPU | virtio-fs 把 FS 客户端整体虚拟化到 DPU，主机零修改，后端可插拔 | 硬件在售、代码开源（IBM/DPFS），工程可复现性最好之一 |
 | Fisc | FAST 2023 | 自研 DPU + RDMA | 轻客户端（DPU agent + 存储侧 proxy 两层聚合）+ 存储感知分布式网关 + virtio-Fisc DPU 直通，云原生高密度接入 | 深度绑定阿里基础设施，不可复现；架构模式可借鉴 |

@@ -14,7 +14,8 @@
 > - [新硬件综述 §2](new-hardware.md#2-assise-performance-and-availability-via-client-local-nvm-in-a-distributed-file-system)：本文的简述版。
 > - [LineFS（SOSP 2021）精读](linefs-sosp2021.md)：在 Assise 之上把 SharedFS 的后台工作卸载到 SmartNIC，是 Assise 的直接后续。
 > - [DAOS（SCFA 2020）精读](daos-scfa2020.md)：同为 Optane 时代的系统，但走"服务器端 PM + 用户态存储服务"路线。
-> - [SingularFS（ATC 2023）精读](singularfs-atc2023.md)、[HMFS（SoCC 2025）精读](hmfs-socc2025.md)：PM 时代的元数据服务，与 Assise 的"数据与元数据都放客户端本地"形成对照。
+> - [Octopus+（ACM TOS 2021）精读](octopus-plus-tos2021.md)：本文主要对比对象 Octopus 的期刊扩展版，代表"服务器端 NVM 池化 + 单边 RDMA"路线。
+- [SingularFS（ATC 2023）精读](singularfs-atc2023.md)、[HMFS（SoCC 2025）精读](hmfs-socc2025.md)：PM 时代的元数据服务，与 Assise 的"数据与元数据都放客户端本地"形成对照。
 
 ## 目录
 
@@ -597,7 +598,7 @@ flowchart TB
 - Thomas E. Anderson, Marco Canini, Jongyul Kim, Dejan Kostić, Youngjin Kwon, Simon Peter, Waleed Reda, Henry N. Schuh, Emmett Witchel. *Assise: Performance and Availability via Client-local NVM in a Distributed File System*. USENIX OSDI 2020. <https://www.usenix.org/conference/osdi20/presentation/anderson>
 - Youngjin Kwon et al. *Strata: A Cross Media File System*. ACM SOSP 2017.
 - Jongyul Kim et al. *LineFS: Efficient SmartNIC Offload of a Distributed File System with Pipeline Parallelism*. ACM SOSP 2021.（本仓库精读：[linefs-sosp2021.md](linefs-sosp2021.md)）
-- Youyou Lu, Jiwu Shu, Youmin Chen, Tao Li. *Octopus: an RDMA-enabled Distributed Persistent Memory File System*. USENIX ATC 2017.
+- Youyou Lu, Jiwu Shu, Youmin Chen, Tao Li. *Octopus: an RDMA-enabled Distributed Persistent Memory File System*. USENIX ATC 2017.（期刊扩展版 Octopus+ 的本仓库精读：[octopus-plus-tos2021.md](octopus-plus-tos2021.md)）
 - Jian Yang, Joseph Izraelevitz, Steven Swanson. *Orion: A Distributed File System for Non-Volatile Main Memory and RDMA-Capable Networks*. USENIX FAST 2019.
 - Robbert van Renesse, Fred B. Schneider. *Chain Replication for Supporting High Throughput and Availability*. USENIX OSDI 2004.
 - Cary G. Gray, David R. Cheriton. *Leases: An Efficient Fault-Tolerant Mechanism for Distributed File Cache Consistency*. ACM SOSP 1989.
