@@ -1,0 +1,28 @@
+{
+  "prompt": "【类型】系统架构总览图\n【主题】Tectonic 一个集群里有什么、一次读写怎么走\n【视觉结构】横版，自左向右 + 上下分层\n- 最左：应用图标（Blob 存储、数据仓库），箭头进入\n- 左中：一个大方框 \"Client Library\"，内部三个小标签：\"RS编码/副本\"、\"限流器\"、\"按调用配置\"。旁边便签：\"编排所有 RPC，以 chunk 为粒度读写\"\n- 右上：大框 \"Metadata Store\"，内部从上到下三层堆叠：\"Name 层（目录→子目录/文件）\"、\"File 层（文件→block列表）\"、\"Block 层（block→磁盘/chunk）\"，三层底下一条横条 \"ZippyDB 键值存储（Paxos 复制, RocksDB）\"\n- 右下：大框 \"Chunk Store\"，画一排存储节点，每个节点画 36 块硬盘小格 + 1 块 SSD 小格，标注 \"XFS · 36×HDD + 1TB SSD\"\n- 最右竖条：\"后台服务（无状态）\"：垃圾回收、Rebalancer、修复/扫描、磁盘清单、统计\n- 箭头编号路径（深蓝色粗箭头）：①Client→Name 层\"查目录\" ②Client→File 层\"查文件的 blocks\" ③Client→Block 层\"查 chunk 位置\" ④Client→Chunk Store\"直接读写 chunk\"\n- 角落小图例：灰色=无状态，彩色=有状态；红色圈注 \"只有 Metadata Store 和 Chunk Store 有状态\"\n【语言】中文（英文术语按原样保留，不要改写拼写）\n【必须出现的标签】Client Library、Metadata Store、Name 层、File 层、Block 层、ZippyDB、Chunk Store、后台服务、无状态\n【风格】sketchnote 科研手抄报：明亮浅米白底(#FFF8EA)，黑色手绘线条，墨迹粗细变化；强调色只用深蓝/珊瑚红/橄榄绿/柔和黄色，清爽不过饱和；手绘感箭头；中文手写体但清晰可读；可少量放大镜、星号、便签、圈注等趣味符号，但服务理解；主体图解占画面75%-85%；右下角手写页码。\n【禁止】不要代码块、照片写实、3D渲染；不要旧羊皮纸、暗角、污渍、黄褐色复古调；不要大面积空白；不要随机英文或拼写变体；不要水印、广告风格、伪论文截图；不要图标题以外的长段正文。\n页码：2/10",
+  "negativePrompt": "水印，模糊文字，错乱标签，随机英文，拼写错误，旧羊皮纸，暗角，污渍，3D渲染，照片写实，大面积空白，广告风格",
+  "aspectRatio": "16:9",
+  "imageSize": "1K",
+  "caption": "Tectonic 整体架构：客户端驱动的微服务",
+  "intent": "Client Library 直接编排 Metadata Store 与 Chunk Store；除两个存储层外所有组件无状态",
+  "figure_spec": {
+    "figure_kind": "method diagram",
+    "caption": "Tectonic 整体架构：客户端驱动的微服务",
+    "communicative_intent": "Client Library 直接编排 Metadata Store 与 Chunk Store；除两个存储层外所有组件无状态",
+    "required_labels": [
+      "Client Library",
+      "Metadata Store",
+      "Name 层",
+      "File 层",
+      "Block 层",
+      "ZippyDB",
+      "Chunk Store",
+      "后台服务",
+      "无状态"
+    ],
+    "forbidden_labels": [],
+    "layout_brief": "横版 16:9，见 prompt 视觉结构",
+    "style_brief": "sketchnote 明亮科研手抄报，中文",
+    "source_context": "Pan et al., Facebook's Tectonic Filesystem: Efficiency from Exascale, FAST 2021"
+  }
+}
