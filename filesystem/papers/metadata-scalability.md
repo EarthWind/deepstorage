@@ -132,17 +132,19 @@ POSIX 语义要求逐级检查路径上每一级目录的存在性与权限。�
 
 ### 2.5 λFS: A Scalable and Elastic Distributed File System Metadata Service using Serverless Functions（ASPLOS 2023）
 
-- **作者/机构**：Benjamin Carver、Runzhou Han、Jingyuan Zhang、Mai Zheng、Yue Cheng；George Mason University、Iowa State University、University of Virginia（分工待确认）
-- **会议/年份**：ACM ASPLOS 2023（Volume 4）
+- **作者/机构**：Benjamin Carver、Jingyuan Zhang（George Mason University）；Runzhou Han、Mai Zheng（Iowa State University）；Yue Cheng（University of Virginia，通讯作者）
+- **会议/年份**：ACM ASPLOS '23（Volume 4，2024 年 4 月在 ASPLOS '24 会上报告）
 - **链接**：https://dl.acm.org/doi/10.1145/3623278.3624765 ；arXiv: https://arxiv.org/abs/2306.11877 ；代码：https://github.com/ds2-lab/LambdaFS
 - **解决的问题**："serverful" MDS 要么不可扩展，要么难以同时兼顾性能、资源利用率与成本；面对潮汐负载无法快速弹性伸缩。
 - **核心设计**：
-  - 基于 **HopsFS**（NameNode 状态外置到 NDB/NewSQL 的 HDFS 变体）改造：把 NameNode 逻辑拆成**大规模并行的 serverless 函数**（OpenWhisk/Nuclio 平台），函数内缓存元数据、按负载自动增缩。
-  - **namespace 划分**：按（目录）一致性 hash 把元数据操作路由到函数实例，实例内维护缓存亲和性。
-  - **事务/一致性**：底层仍由 NewSQL 数据库（MySQL NDB）承担事务与持久化；函数层为缓存/计算层。
+  - 基于 **HopsFS 3.2.0.3**（NameNode 状态外置到 MySQL NDB 的 HDFS 变体）改造：把 NameNode 改写成 **serverless 函数**（OpenWhisk，另支持 Nuclio），函数实例内存以 trie 缓存整条路径的 INode，按负载自动增缩。
+  - **RPC**：首次经 FaaS 网关发 HTTP 调用（约 8–20 ms），函数实例随后主动 TCP 连回客户端，之后走 TCP（约 1–2 ms）；每个 TCP 请求以 ≤1% 的概率改走 HTTP，让平台感知负载并扩容。
+  - **namespace 划分**：按父目录一致性哈希到固定的 n 个函数 deployment；deployment 内实例数自动伸缩，热点目录靠增加实例分担读。
+  - **事务/一致性**：NDB 承担事务与持久化；写操作先经 ZooKeeper 向缓存了相关 INode 的 deployment 发 INV、收齐 ACK，再在 NDB 排他锁下提交；子树操作用一次前缀失效。
   - **存储引擎**：MySQL NDB Cluster（继承自 HopsFS）。
-- **关键实验结果**：在真实与合成负载下显著优于 HopsFS（尖峰负载下延迟与成本均优；具体倍数随负载而异，详见论文），弹性伸缩无需人工扩容。
-- **局限性**：serverless 平台冷启动与调用开销；依赖外部数据库的事务吞吐上限；工程栈（Java/OpenWhisk）与传统 C++ 存储栈差异大。
+- **关键实验结果**：Spotify 突发负载（基准 25k ops/s）下平均延迟 1.02 ms 对 HopsFS 10.58 ms（−90.40%），5 分钟成本 $0.35 对 $2.50（−85.99%，按 Lambda 单价折算）；512 vCPU 下 read/stat/ls 吞吐是 HopsFS 的 28.91×/8.22×/20.53×；但写延迟比 HopsFS 高 1.5–5.55×，create 吞吐只高 1.49×、mkdir 持平（瓶颈在 NDB）。
+- **局限性**：写路径付出一致性协议开销；写吞吐受 NDB 上限约束；依赖改造过的 OpenWhisk（单实例并发度），在商用 Lambda 上 TCP 长连接与按调用计费的模型冲突；工程栈（Java/OpenWhisk）与传统 C++ 存储栈差异大。
+- **逐节精读**：[lambdafs-asplos2023.md](lambdafs-asplos2023.md)
 - **设计启示**："元数据 = 无状态计算层 + 有状态存储层"的分层让弹性成为配置问题而非架构问题。即使不用 FaaS，也可让元数据服务进程无状态化（缓存 + 路由），把持久状态收敛到复制状态机/KV 层，从而支持元数据节点快速增删。
 
 ### 2.6 FileScale: Fast and Elastic Metadata Management for Distributed File Systems（SoCC 2023）
@@ -253,7 +255,7 @@ POSIX 语义要求逐级检查路径上每一级目录的存在性与权限。�
 | InfiniFS (FAST'22) | access/content 元数据解耦，按目录 hash 分组 | speculative 并行解析 + 客户端乐观缓存 | 文件 rename 2PC；目录 rename 经中心协调者防环 + 广播失效 | RocksDB（每台元数据服务器） | 1000 亿文件；73× vs HopsFS |
 | CFS (EuroSys'23) | 属性与 namespace 分层：TafDB（按父 id 范围分区）+ FileStore（按 id 哈希） | 客户端逐级 lookup，单级单分片 | 同目录文件 rename 单分片快路径；其余 Renamer 加锁 + 2PC | TafDB + FileStore（RocksDB） | 生产 3 年；50 节点 1.22–4.10× vs InfiniFS |
 | SingularFS (ATC'23) | 不分区（单 MDS，机内 hybrid inode partition：NUMA 间按目录组、NUMA 内按键哈希） | 逐级 lookup + 客户端目录元数据缓存 | 日志（2 个 inode）+ 严格 2PL，无分布式协调 | P-Masstree on Optane PM + RDMA | 每 NUMA 17.5 亿文件；单机 create 8.36M ops/s |
-| λFS (ASPLOS'23) | serverless 函数一致性 hash 路由 + 函数内缓存 | 函数内缓存解析，未命中查 DB | 底层 NewSQL 分布式事务 | MySQL NDB Cluster | 弹性伸缩；优于 HopsFS（负载相关） |
+| λFS (ASPLOS'23) | 按父目录一致性 hash 到固定 deployment + 函数内缓存 | 函数内缓存解析，未命中查 DB | NDB 事务 + INV/ACK 缓存失效 | MySQL NDB Cluster | 弹性伸缩；读吞吐 8–31× HopsFS，写更慢 |
 | FileScale (SoCC'23) | 三层：内存缓存 + DDBMS shared-nothing 分区 | 内存层快路径 | DDBMS 分布式 ACID 事务 | 分布式数据库（Calvin 谱系，待确认） | 小规模≈单机 HDFS；线性扩展 |
 | Mantle (SOSP'25) | TafDB 分片（全量）+ 每 namespace 单机 IndexNode（目录骨架） | IndexNode 单 RPC lookup | 环检测 offload 至 IndexNode；delta 更新 | TafDB | 100 亿对象/namespace；1.8M lookup/s；生产 2 年 |
 | HMFS (SoCC'25) | 无序（hash）索引 + 对象间链接维护目录语义 | hash 点查 | 待确认 | PM 上无序索引 + 链接结构 | 显著超有序索引方案（数字待确认） |
