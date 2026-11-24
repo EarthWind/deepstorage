@@ -14,7 +14,7 @@
 > - [元数据扩展性综述 §2.10](metadata-scalability.md#210-mesafs-an-io-efficient-metadata-service-for-distributed-file-systemseurosys-2026)：本文的简述版。
 > - [HMFS（SoCC 2025）精读](hmfs-socc2025.md)：同组同期工作，面向 PM；MesaFS 面向 NVMe SSD，两者都放弃了全局有序索引。
 > - [SingularFS（ATC 2023）精读](singularfs-atc2023.md)：同一第一作者的前作，同样用"有序写 + 时间戳"代替日志。
-> - [InfiniFS（FAST 2022）精读](infinifs-fast2022.md)：MesaFS 的主要基线（作者自行仿真的 InfiniFS-emu），分区方案也沿用它。
+> - [InfiniFS（FAST 2022）精读](infinifs-fast2022/deep-read.md)：MesaFS 的主要基线（作者自行仿真的 InfiniFS-emu），分区方案也沿用它。
 
 ## 目录
 
@@ -529,14 +529,14 @@ xychart-beta
 | **MesaFS** | NVMe SSD | 目录间哈希表 + 目录内 WO-HTree（哈希序） | 遍历该目录的 WO-HTree | 有序同步写 + 父目录延迟持久化 + 临时 backpointer，单页原子写 | 全盘扫描修复不变式，518 万文件/s |
 | [HMFS](hmfs-socc2025.md) | PM | 每服务器一个 PM 哈希表 | 目录内单链表 | 8/16 字节原子写 + 有序写 | 按需恢复，65.7 ms 恢复服务 |
 | [SingularFS](singularfs-atc2023.md) | PM | PM 有序树（P-Masstree） | 有序范围扫描 | 无日志有序更新 + 时间戳 | 启动时检测 |
-| [InfiniFS](infinifs-fast2022.md) | SSD（RocksDB） | 有序 LSM | 范围查询 | 本地事务 + 跨服务器 2PC | RocksDB 日志重放 |
+| [InfiniFS](infinifs-fast2022/deep-read.md) | SSD（RocksDB） | 有序 LSM | 范围查询 | 本地事务 + 跨服务器 2PC | RocksDB 日志重放 |
 | [CFS](cfs-eurosys2023.md) | SSD（TafDB、RocksDB） | 有序（范围分区）+ 哈希 | 范围查询 | 单分片原语，跨层不做 2PC | 数据库与 GC |
 | [FalconFS](falconfs-nsdi2026.md) | SSD（PostgreSQL） | B-link 树 | 数据库查询 | 数据库事务 + 请求合并（合并 WAL 写） | WAL 重放 |
 | [3FS](3fs-fireflyer-sc2024.md) | SSD（FoundationDB） | 有序 KV | 范围查询 | FoundationDB 事务 | 数据库 |
 
 **解读**：
 
-- **清华存储组近年的元数据路线**：[InfiniFS](infinifs-fast2022.md)（分区与路径解析）→ [SingularFS](singularfs-atc2023.md)（单机 PM、无日志）→ [HMFS](hmfs-socc2025.md)（PM、哈希 + 链表）与 MesaFS（SSD、哈希 + WO-HTree）。后两者的共同判断是：**ls 只需"目录内可遍历"，不需要全局有序**；共同手段是：**把提交状态编码进对象（时间戳、状态位、backpointer），以有序写代替日志**。
+- **清华存储组近年的元数据路线**：[InfiniFS](infinifs-fast2022/deep-read.md)（分区与路径解析）→ [SingularFS](singularfs-atc2023.md)（单机 PM、无日志）→ [HMFS](hmfs-socc2025.md)（PM、哈希 + 链表）与 MesaFS（SSD、哈希 + WO-HTree）。后两者的共同判断是：**ls 只需"目录内可遍历"，不需要全局有序**；共同手段是：**把提交状态编码进对象（时间戳、状态位、backpointer），以有序写代替日志**。
 - **介质决定数据结构**：PM 字节可寻址，链表的随机读代价小，HMFS 用链表；SSD 以页为单位，需要把同一目录的条目聚在同一页里，MesaFS 用 HTree。二者都避免了 B+ 树的重平衡和 LSM 树的合并。
 - **对工业系统的启发**：3FS、CFS、FalconFS 等都把元数据放在通用事务数据库或有序 KV 上，每次 create 至少要写 WAL 和数据页。MesaFS 的分项分析（图 12）表明，换成"按目录分组的存储 + 无日志有序更新 + 父目录延迟持久化"，单服务器 create 吞吐可提升一个数量级以上（约 15k → 335k）。即使不自研存储引擎，"父目录 mtime/nlink 是冗余状态，可以批量合并写"这一点也值得借鉴，FalconFS 的请求合并与之思路相近。
 
@@ -617,7 +617,7 @@ flowchart TB
 - Hao Guo, Jiwu Shu, Youyou Lu. *MesaFS: An I/O-Efficient Metadata Service for Distributed File Systems*. ACM EuroSys 2026. <https://dl.acm.org/doi/10.1145/3767295.3803573>
 - Wenhao Lv, Hao Guo, Qing Wang, Youyou Lu, Jiwu Shu. *Accelerating Distributed Filesystem Metadata Service via Decoupling Directory Semantics from Metadata Indexing*（HMFS）. ACM SoCC 2025.（本仓库精读：[hmfs-socc2025.md](hmfs-socc2025.md)）
 - Hao Guo, Youyou Lu, Wenhao Lv, et al. *SingularFS: A Billion-Scale Distributed File System Using a Single Metadata Server*. USENIX ATC 2023.（本仓库精读：[singularfs-atc2023.md](singularfs-atc2023.md)）
-- Wenhao Lv, Youyou Lu, Yiming Zhang, Peile Duan, Jiwu Shu. *InfiniFS: An Efficient Metadata Service for Large-Scale Distributed Filesystems*. USENIX FAST 2022.（本仓库精读：[infinifs-fast2022.md](infinifs-fast2022.md)）
+- Wenhao Lv, Youyou Lu, Yiming Zhang, Peile Duan, Jiwu Shu. *InfiniFS: An Efficient Metadata Service for Large-Scale Distributed Filesystems*. USENIX FAST 2022.（本仓库精读：[infinifs-fast2022/deep-read.md](infinifs-fast2022/deep-read.md)）
 - Gregory R. Ganger et al. *Soft Updates: A Solution to the Metadata Update Problem in File Systems*. ACM TOCS 18(2), 2000.
 - Vijay Chidambaram et al. *Consistency Without Ordering*（backpointer-based consistency）. USENIX FAST 2012.
 - Daniel Phillips. *A Directory Index for EXT2*（HTree）. ALS 2001.
@@ -625,4 +625,4 @@ flowchart TB
 - Kai Ren, Garth Gibson. *TABLEFS: Enhancing Metadata Efficiency in the Local File System*. USENIX ATC 2013.
 - Baptiste Lepers et al. *KVell: The Design and Implementation of a Fast Persistent Key-Value Store*. ACM SOSP 2019.
 - NVM Express. *NVMe Base Specification, Revision 1.4c*（AWUPF）.
-- 本仓库相关：[元数据扩展性综述](metadata-scalability.md)、[HMFS 精读](hmfs-socc2025.md)、[SingularFS 精读](singularfs-atc2023.md)、[InfiniFS 精读](infinifs-fast2022.md)、[CFS 精读](cfs-eurosys2023.md)、[FalconFS 精读](falconfs-nsdi2026.md)、[3FS 精读](3fs-fireflyer-sc2024.md)
+- 本仓库相关：[元数据扩展性综述](metadata-scalability.md)、[HMFS 精读](hmfs-socc2025.md)、[SingularFS 精读](singularfs-atc2023.md)、[InfiniFS 精读](infinifs-fast2022/deep-read.md)、[CFS 精读](cfs-eurosys2023.md)、[FalconFS 精读](falconfs-nsdi2026.md)、[3FS 精读](3fs-fireflyer-sc2024.md)

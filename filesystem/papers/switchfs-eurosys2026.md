@@ -14,7 +14,7 @@
 > - [元数据扩展性综述 §2.11](metadata-scalability.md#211-switchfs-asynchronous-metadata-updates-for-distributed-filesystems-with-in-network-coordinationeurosys-2026)：本文的简述版。
 > - [FalconFS（NSDI 2026）精读](falconfs-nsdi2026.md)：同一第一作者、同一团队的同期工作，同样针对目录争用，但走"服务端请求合并"路线。
 > - [CFS（EuroSys 2023）精读](cfs-eurosys2023.md)：SwitchFS 的主要基线之一（Emulated-CFS，P/C 分离），其 delta apply 与本文的 change-log 合并同源。
-> - [InfiniFS（FAST 2022）精读](infinifs-fast2022.md)：另一个主要基线（Emulated-InfiniFS，P/C 聚合）。
+> - [InfiniFS（FAST 2022）精读](infinifs-fast2022/deep-read.md)：另一个主要基线（Emulated-InfiniFS，P/C 聚合）。
 > - [Mantle（SOSP 2025）精读](mantle-sosp2025.md)、[MesaFS（EuroSys 2026）精读](mesafs-eurosys2026.md)：同样"推迟或追加父目录更新"的另外两种做法。
 
 ## 目录
@@ -710,7 +710,7 @@ SwitchFS 把突发缓冲在 change-log 中稍后应用，吞吐稳定。
 | [MesaFS](mesafs-eurosys2026.md) | 父目录更新缓冲在内存、合并后写盘 | 下一次以父目录为目标的操作 | 内存中始终是最新的，只是落盘推迟；崩溃后从子项重算 | 父子同机（按目录分区） |
 | [FalconFS](falconfs-nsdi2026.md) | 同类请求合并进一个事务 | 不推迟，只是批量 | 同步完成 | — |
 | [HMFS](hmfs-socc2025.md) | 16 字节 CAS 同时更新 child_ptr 与 mtime | 不推迟 | 同步完成 | PM |
-| [InfiniFS](infinifs-fast2022.md) | 父子同机，本地事务 | 不推迟 | 同步完成 | — |
+| [InfiniFS](infinifs-fast2022/deep-read.md) | 父子同机，本地事务 | 不推迟 | 同步完成 | — |
 
 **解读**：
 
@@ -796,7 +796,7 @@ flowchart TB
 - Jingwei Xu, Mingkai Dong, Qiulin Tian, Ziyi Tian, Tong Xin, Haibo Chen. *SwitchFS: Asynchronous Metadata Updates for Distributed Filesystems with In-Network Coordination*. ACM EuroSys 2026. <https://dl.acm.org/doi/10.1145/3767295.3769349>；arXiv:2410.08618 <https://arxiv.org/abs/2410.08618>
 - Jingwei Xu et al. *FalconFS: Distributed File System for Large-Scale Deep Learning Pipeline*. USENIX NSDI 2026.（本仓库精读：[falconfs-nsdi2026.md](falconfs-nsdi2026.md)）
 - Yiduo Wang et al. *CFS: Scaling Metadata Service for Distributed File System via Pruned Scope of Critical Sections*. ACM EuroSys 2023.（本仓库精读：[cfs-eurosys2023.md](cfs-eurosys2023.md)）
-- Wenhao Lv et al. *InfiniFS: An Efficient Metadata Service for Large-Scale Distributed Filesystems*. USENIX FAST 2022.（本仓库精读：[infinifs-fast2022.md](infinifs-fast2022.md)）
+- Wenhao Lv et al. *InfiniFS: An Efficient Metadata Service for Large-Scale Distributed Filesystems*. USENIX FAST 2022.（本仓库精读：[infinifs-fast2022/deep-read.md](infinifs-fast2022/deep-read.md)）
 - Xin Jin et al. *NetCache: Balancing Key-Value Stores with Fast In-Network Caching*. ACM SOSP 2017.
 - Jialin Li et al. *Pegasus: Tolerating Skewed Workloads in Distributed Storage with In-Network Coherence Directories*. USENIX OSDI 2020.
 - Hang Zhu et al. *Harmonia: Near-Linear Scalability for Replicated Storage with In-Network Conflict Detection*. PVLDB.
@@ -804,4 +804,4 @@ flowchart TB
 - Edmund B. Nightingale et al. *Rethink the Sync*. ACM TOCS 26(3), 2008.
 - Qing Zheng et al. *DeltaFS: A Scalable No-Ground-Truth Filesystem for Massively-Parallel Computing*. SC 2021.
 - Austin T. Clements et al. *The Scalable Commutativity Rule*. CACM 60(8), 2017.
-- 本仓库相关：[元数据扩展性综述](metadata-scalability.md)、[FalconFS 精读](falconfs-nsdi2026.md)、[CFS 精读](cfs-eurosys2023.md)、[InfiniFS 精读](infinifs-fast2022.md)、[Mantle 精读](mantle-sosp2025.md)、[MesaFS 精读](mesafs-eurosys2026.md)、[HMFS 精读](hmfs-socc2025.md)、[新硬件综述](new-hardware.md)
+- 本仓库相关：[元数据扩展性综述](metadata-scalability.md)、[FalconFS 精读](falconfs-nsdi2026.md)、[CFS 精读](cfs-eurosys2023.md)、[InfiniFS 精读](infinifs-fast2022/deep-read.md)、[Mantle 精读](mantle-sosp2025.md)、[MesaFS 精读](mesafs-eurosys2026.md)、[HMFS 精读](hmfs-socc2025.md)、[新硬件综述](new-hardware.md)

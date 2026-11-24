@@ -636,7 +636,7 @@ FileScale 用**广度优先搜索**找出缓存层中相关的脏 inode，批量
 | **FileScale**（SoCC 2023） | **按前缀独占的写回缓存** | 命中时无；只写远程 WAL | 先刷脏、逐出，再交给 DDBMS 事务 | 改挂载表迁移前缀 |
 | [λFS](lambdafs-asplos2023.md)（ASPLOS '23） | 按父目录哈希的 serverless 读缓存，同一分区可有多个实例 | 读命中时无；写同步提交 NDB | NDB 事务 + INV/ACK 缓存失效 | FaaS 自动扩缩实例 |
 | [CFS](cfs-eurosys2023.md)（EuroSys 2023） | 去掉代理层，客户端直接访问 TafDB | 每次都访问 TafDB，但多为单分片原语 | 独立 Renamer + 单分片原语 | 依赖底层 KV |
-| [InfiniFS](infinifs-fast2022.md)（FAST 2022） | 有状态 MDS（访问 / 内容元数据分离） | 本地 KV | 2PC | 静态 |
+| [InfiniFS](infinifs-fast2022/deep-read.md)（FAST 2022） | 有状态 MDS（访问 / 内容元数据分离） | 本地 KV | 2PC | 静态 |
 | [Tectonic](tectonic-fast2021/deep-read.md)（FAST 2021） | 无状态元数据服务 | 每次访问 ZippyDB | 非原子，多步 + backpointer + GC | 改路由 |
 | [SingularFS](singularfs-atc2023.md)（ATC 2023） | 单台元数据服务器 | 本地 PM | 不需要 | 无 |
 
@@ -735,4 +735,4 @@ flowchart TB
 - Pulkit A. Misra et al. *Scaling Distributed File Systems in Resource-Harvesting Datacenters*. USENIX ATC 2017.（HDFS Router-based Federation 的来源之一）
 - Apache Hadoop. *HDFS Router-based Federation*；*HDFS ViewFs Guide*；*NNThroughputBenchmark*.
 - VoltDB <https://www.voltdb.com>；Apache Ignite <https://ignite.apache.org>
-- 本仓库相关：[元数据扩展性综述](metadata-scalability.md)、[λFS 精读](lambdafs-asplos2023.md)、[CFS 精读](cfs-eurosys2023.md)、[InfiniFS 精读](infinifs-fast2022.md)、[Tectonic 精读](tectonic-fast2021/deep-read.md)、[SingularFS 精读](singularfs-atc2023.md)
+- 本仓库相关：[元数据扩展性综述](metadata-scalability.md)、[λFS 精读](lambdafs-asplos2023.md)、[CFS 精读](cfs-eurosys2023.md)、[InfiniFS 精读](infinifs-fast2022/deep-read.md)、[Tectonic 精读](tectonic-fast2021/deep-read.md)、[SingularFS 精读](singularfs-atc2023.md)

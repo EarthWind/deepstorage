@@ -445,7 +445,7 @@ flowchart TB
 **解读**：
 
 - 3FS 的元数据设计是"**教科书式的 KV 化**"：inode 表 + dentry 表、目录内 dentry 连续、跨键操作用事务。新意不在结构，而在几处**针对训练负载的减法**：不跟踪只读 fd、文件长度最终一致、大 stripe + 链数提示。
-- 与 [InfiniFS](infinifs-fast2022.md)、[CFS](cfs-eurosys2023.md) 相比，3FS 没有在元数据扩展性上做专门优化（没有特殊分区、没有可合并更新），也没有客户端路径解析加速——它把元数据性能上限交给了 FoundationDB。这对"文件大、数量适中"的负载足够，对 [FalconFS](falconfs-nsdi2026.md) 面对的"3000 亿小文件随机遍历"则未必。
+- 与 [InfiniFS](infinifs-fast2022/deep-read.md)、[CFS](cfs-eurosys2023.md) 相比，3FS 没有在元数据扩展性上做专门优化（没有特殊分区、没有可合并更新），也没有客户端路径解析加速——它把元数据性能上限交给了 FoundationDB。这对"文件大、数量适中"的负载足够，对 [FalconFS](falconfs-nsdi2026.md) 面对的"3000 亿小文件随机遍历"则未必。
 - rename 走 FoundationDB 的通用事务，能保证原子性（包括目录 rename 和环检测）。这比 Tectonic 只有分片内事务的 ZippyDB 强，也是 3FS 敢于支持"临时目录写完再整体 rename"模式的原因。
 
 ---
@@ -945,4 +945,4 @@ flowchart LR
 - Robbert van Renesse, Fred B. Schneider. *Chain Replication for Supporting High Throughput and Availability*. OSDI 2004.
 - Jingyu Zhou et al. *FoundationDB: A Distributed Unbundled Transactional Key Value Store*. SIGMOD 2021.
 - 本仓库 3FS 源码调研：[project/3fs/README.md](../project/3fs/README.md)（元数据、数据路径、一致性、高可用、运维、性能、评估）
-- 本仓库相关精读：[FalconFS（NSDI 2026）](falconfs-nsdi2026.md)、[Tectonic（FAST 2021）](tectonic-fast2021/deep-read.md)、[InfiniFS（FAST 2022）](infinifs-fast2022.md)、[CFS（EuroSys 2023）](cfs-eurosys2023.md)、[Tectonic-Shift（ATC 2023）](tectonic-shift-atc2023.md)
+- 本仓库相关精读：[FalconFS（NSDI 2026）](falconfs-nsdi2026.md)、[Tectonic（FAST 2021）](tectonic-fast2021/deep-read.md)、[InfiniFS（FAST 2022）](infinifs-fast2022/deep-read.md)、[CFS（EuroSys 2023）](cfs-eurosys2023.md)、[Tectonic-Shift（ATC 2023）](tectonic-shift-atc2023.md)

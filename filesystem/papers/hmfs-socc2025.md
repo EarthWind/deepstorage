@@ -12,7 +12,7 @@
 >
 > 相关文档：
 > - [元数据扩展性综述 §2.8](metadata-scalability.md#28-hmfs-accelerating-distributed-filesystem-metadata-service-via-decoupling-directory-semantics-from-metadata-indexingsocc-2025)：本文的简述版。
-> - [InfiniFS（FAST 2022）精读](infinifs-fast2022.md)：同一作者（Wenhao Lv）的前作，HMFS 沿用其按目录分区方案，并把它作为基线。
+> - [InfiniFS（FAST 2022）精读](infinifs-fast2022/deep-read.md)：同一作者（Wenhao Lv）的前作，HMFS 沿用其按目录分区方案，并把它作为基线。
 > - [SingularFS（ATC 2023）精读](singularfs-atc2023.md)：同组（Hao Guo）的前作，同样在 PM 上做无日志元数据更新，是 HMFS 最强的基线。
 > - [MesaFS（EuroSys 2026）精读](mesafs-eurosys2026.md)：同组同期工作，把同样的思路用在 NVMe SSD 上（目录间哈希 + 目录内 WO-HTree，父目录延迟持久化）。
 > - [Mantle（SOSP 2025）精读](mantle-sosp2025.md)、[CFS（EuroSys 2023）精读](cfs-eurosys2023.md)：同样讨论"目录语义 / 元数据拆分"，但关注点在分区与协调，而不是单机存储引擎。
@@ -188,7 +188,7 @@ flowchart TB
 
 用一致性哈希按分区键分布。于是**一个目录的内容元数据、其子目录的访问元数据、其子文件的元数据都在同一台服务器上**，既可扩展，又有目录内局部性（论文 §3.1）。
 
-**解读**：这正是 [InfiniFS 的访问 / 内容元数据拆分](infinifs-fast2022.md)。它保证了"列一个目录所需的所有对象都在本机"，所以链表只需是本地链表，不用跨服务器指针；也保证了 create/delete 这类双点操作只涉及一台服务器。代价与 InfiniFS 相同：一个大的共享目录的所有子项都在一台服务器上（论文 §4 承认这一点，见 [§8](#8-讨论硬件与共享大目录)）。
+**解读**：这正是 [InfiniFS 的访问 / 内容元数据拆分](infinifs-fast2022/deep-read.md)。它保证了"列一个目录所需的所有对象都在本机"，所以链表只需是本地链表，不用跨服务器指针；也保证了 create/delete 这类双点操作只涉及一台服务器。代价与 InfiniFS 相同：一个大的共享目录的所有子项都在一台服务器上（论文 §4 承认这一点，见 [§8](#8-讨论硬件与共享大目录)）。
 
 ---
 
@@ -601,7 +601,7 @@ HMFS 的定位：无序索引 + 每目录链表，同时获得 O(1) 查找和快
 |------|-----------|----------------|---------|-----------|---------|
 | **HMFS** | PM 哈希表（DASH） | 目录内链表（child_ptr / sibling_ptr） | 8/16 字节原子写 + 有序写，按需恢复 | 按目录，多台服务器 | 单机存储引擎 |
 | [SingularFS](singularfs-atc2023.md) | PM 有序树（P-Masstree） | 有序范围扫描 | 无日志有序更新 + 时间戳，锁持久化在 PM | 单台服务器，NUMA 间/内混合分区 | 单机存储引擎 + NUMA |
-| [InfiniFS](infinifs-fast2022.md) | RocksDB（有序 LSM） | 范围查询 | RocksDB 事务 + 跨服务器 2PC | 按目录（访问 / 内容元数据分离） | 分区与路径解析 |
+| [InfiniFS](infinifs-fast2022/deep-read.md) | RocksDB（有序 LSM） | 范围查询 | RocksDB 事务 + 跨服务器 2PC | 按目录（访问 / 内容元数据分离） | 分区与路径解析 |
 | [CFS](cfs-eurosys2023.md) | TafDB（有序，范围分区）+ FileStore（RocksDB） | 范围查询 | 单分片原语，跨层不做 2PC | 范围 + 哈希两种存储 | 临界区裁剪 |
 | [Mantle](mantle-sosp2025.md) | TafDB + IndexNode 内存表 | TafDB 范围查询 | 数据库事务 + delta 记录 | 共享 TafDB + 每命名空间 IndexNode | 对象存储的路径解析与目录竞争 |
 | [FalconFS](falconfs-nsdi2026.md) | PostgreSQL（B-link 树） | 数据库查询 | 数据库事务 + 请求合并 | 文件名哈希 + 全量复制目录树 | AI 负载的无状态客户端 |
@@ -609,7 +609,7 @@ HMFS 的定位：无序索引 + 每目录链表，同时获得 O(1) 查找和快
 
 **解读**：
 
-- **清华存储组的一条连续演进线**：[InfiniFS](infinifs-fast2022.md)（2022，分区 + 路径解析，存储用 RocksDB）→ [SingularFS](singularfs-atc2023.md)（2023，单机 PM，无日志，存储用 P-Masstree）→ HMFS（2025，多机 PM，把有序树换成哈希 + 链表）。每一步都把上一步的瓶颈搬走：InfiniFS 的瓶颈在 RocksDB，SingularFS 解决了日志和单机可扩展性，HMFS 再去掉有序索引。
+- **清华存储组的一条连续演进线**：[InfiniFS](infinifs-fast2022/deep-read.md)（2022，分区 + 路径解析，存储用 RocksDB）→ [SingularFS](singularfs-atc2023.md)（2023，单机 PM，无日志，存储用 P-Masstree）→ HMFS（2025，多机 PM，把有序树换成哈希 + 链表）。每一步都把上一步的瓶颈搬走：InfiniFS 的瓶颈在 RocksDB，SingularFS 解决了日志和单机可扩展性，HMFS 再去掉有序索引。
 - 除 HMFS 外，本仓库的所有元数据系统都把目录遍历建在**有序索引**上。HMFS 证明在 PM 上可以不这么做；但如果底层是 SSD（RocksDB），链表遍历的随机读代价会很高，这个结论不能直接迁移。它的适用前提是**字节可寻址的持久介质**（PM、CXL 内存语义 SSD、UPS 保护的 DRAM）。
 - 对工业系统的启发：大多数系统把点查和遍历都压在同一个有序 KV 上。即使不用 PM，也可以借鉴"按访问模式选结构"：点查走哈希（或带哈希前缀的键），目录遍历单独维护一份按目录聚簇的结构，而不是让所有操作都承担全序成本。
 
@@ -691,7 +691,7 @@ flowchart TB
 ## 参考
 
 - Wenhao Lv, Hao Guo, Qing Wang, Youyou Lu, Jiwu Shu. *Accelerating Distributed Filesystem Metadata Service via Decoupling Directory Semantics from Metadata Indexing*. ACM SoCC 2025. <https://dl.acm.org/doi/10.1145/3772052.3772237>
-- Wenhao Lv, Youyou Lu, Yiming Zhang, Peile Duan, Jiwu Shu. *InfiniFS: An Efficient Metadata Service for Large-Scale Distributed Filesystems*. USENIX FAST 2022.（本仓库精读：[infinifs-fast2022.md](infinifs-fast2022.md)）
+- Wenhao Lv, Youyou Lu, Yiming Zhang, Peile Duan, Jiwu Shu. *InfiniFS: An Efficient Metadata Service for Large-Scale Distributed Filesystems*. USENIX FAST 2022.（本仓库精读：[infinifs-fast2022/deep-read.md](infinifs-fast2022/deep-read.md)）
 - Hao Guo, Youyou Lu, Wenhao Lv, et al. *SingularFS: A Billion-Scale Distributed File System Using a Single Metadata Server*. USENIX ATC 2023.（本仓库精读：[singularfs-atc2023.md](singularfs-atc2023.md)）
 - Baotong Lu, Xiangpeng Hao, Tianzheng Wang, Eric Lo. *Dash: Scalable Hashing on Persistent Memory*. PVLDB 13(8), 2020.
 - Se Kwon Lee et al. *RECIPE: Converting Concurrent DRAM Indexes to Persistent-Memory Indexes*（P-Masstree）. ACM SOSP 2019.
@@ -700,4 +700,4 @@ flowchart TB
 - Yiduo Wang et al. *CFS: Scaling Metadata Service for Distributed File System via Pruned Scope of Critical Sections*. ACM EuroSys 2023.（本仓库精读：[cfs-eurosys2023.md](cfs-eurosys2023.md)）
 - Jian Xu, Steven Swanson. *NOVA: A Log-Structured File System for Hybrid Volatile/Non-Volatile Main Memories*. USENIX FAST 2016.
 - Swapnil Patil, Garth Gibson. *Scale and Concurrency of GIGA+: File System Directories with Millions of Files*. USENIX FAST 2011.
-- 本仓库相关：[元数据扩展性综述](metadata-scalability.md)、[InfiniFS 精读](infinifs-fast2022.md)、[SingularFS 精读](singularfs-atc2023.md)、[CFS 精读](cfs-eurosys2023.md)、[Mantle 精读](mantle-sosp2025.md)、[FalconFS 精读](falconfs-nsdi2026.md)、[3FS 精读](3fs-fireflyer-sc2024.md)
+- 本仓库相关：[元数据扩展性综述](metadata-scalability.md)、[InfiniFS 精读](infinifs-fast2022/deep-read.md)、[SingularFS 精读](singularfs-atc2023.md)、[CFS 精读](cfs-eurosys2023.md)、[Mantle 精读](mantle-sosp2025.md)、[FalconFS 精读](falconfs-nsdi2026.md)、[3FS 精读](3fs-fireflyer-sc2024.md)

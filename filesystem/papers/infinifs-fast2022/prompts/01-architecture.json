@@ -1,0 +1,28 @@
+{
+  "prompt": "【类型】系统架构总览图\n【主题】InfiniFS 有哪些组件，一次 stat(/A/B/file) 怎么走\n【视觉结构】横版三层：上层客户端、中层元数据服务器集群、右侧重命名协调器\n- 上层（左上）：若干客户端方框，其中一个放大为 \"InfiniFS Library\"，内部两个子块：深蓝 \"推测式路径解析 (§3.3)\" 与深蓝 \"AM-Cache 乐观访问元数据缓存 (§3.4)\"（画成一棵小缓存树）\n- 中层：一排 4 个服务器方框 \"MetaServer 0 … MetaServer N\"，每个内部上下两格：\"KV Store（RocksDB，内存缓存 + NVMe 日志）\" 与 \"Inv. List（按版本排序的 rename 记录）\"；服务器上方一条横带标 \"按目录 ID 一致性哈希分片 · 访问/内容解耦分区 (§3.2)\"\n- 右侧：单独一个橙色边框方框 \"Rename Coordinator\"，内部画一个小有向图 \"Renaming Graph（在途目录 rename）\"，旁注 \"只处理目录 rename / set_permission（约占 0.0083%）\"；它用细箭头向所有 MetaServer 的 Inv. List 广播，标 \"broadcast\"\n- 一次请求的示例路径（深蓝粗箭头 + 编号）：① 客户端为 /A/B/file 推测 A、B 的 ID ② 并行查 ⟨0,A⟩、⟨1,B⟩（发往不同服务器）③ 读 ⟨2⟩ 的内容元数据与 ⟨2,file⟩ 的文件元数据（同一服务器）④ 服务器用 Inv. List 校验请求携带的缓存版本\n- 右下角小图例：深蓝 = InfiniFS 核心设计，橙 = 低频路径/协调\n【语言】中文（英文术语、变量名、函数名按原样保留，不要改写拼写）\n【必须出现的标签】InfiniFS Library、推测式路径解析、AM-Cache、MetaServer、KV Store、Inv. List、Rename Coordinator、Renaming Graph、/A/B/file\n【风格】paper-figure：像 FAST/OSDI 顶会论文中重新设计过的高质量方法总览图。纯白或极浅灰底；干净的矢量感模块（圆角矩形、分组框、键值小格、编号步骤圆点）；无衬线字体短标签；黑/深灰为主色，只用两个强调色：深蓝（InfiniFS 的核心设计/关键路径）与橙色（问题、热点、对比项）；主路径箭头粗、辅助箭头细；主体图解占画面 75%-85%，信息密度高但不拥挤；右下角小号页码。\n【禁止】不要手绘风、不要蓝底白线工程图纸风、不要 3D 渲染、不要照片写实、不要渐变和过饱和色；不要营销海报或 PPT 封面感；不要大段说明文字；不要随机英文或拼写变体；不要水印；不要复刻论文原图布局。\n页码：2/8",
+  "negativePrompt": "手绘，涂鸦，蓝图风，3D渲染，照片写实，渐变，过饱和，海报风，水印，模糊文字，错乱标签，随机英文，拼写错误，大面积空白",
+  "aspectRatio": "16:9",
+  "imageSize": "1K",
+  "caption": "InfiniFS 架构总览：客户端库 + 元数据服务器 + 重命名协调器",
+  "intent": "客户端做推测式路径解析并缓存访问元数据；元数据服务器按目录 ID 哈希分片存于本地 KV，并维护失效列表；中心重命名协调器只处理罕见的目录 rename",
+  "figure_spec": {
+    "figure_kind": "method diagram",
+    "caption": "InfiniFS 架构总览：客户端库 + 元数据服务器 + 重命名协调器",
+    "communicative_intent": "客户端做推测式路径解析并缓存访问元数据；元数据服务器按目录 ID 哈希分片存于本地 KV，并维护失效列表；中心重命名协调器只处理罕见的目录 rename",
+    "required_labels": [
+      "InfiniFS Library",
+      "推测式路径解析",
+      "AM-Cache",
+      "MetaServer",
+      "KV Store",
+      "Inv. List",
+      "Rename Coordinator",
+      "Renaming Graph",
+      "/A/B/file"
+    ],
+    "forbidden_labels": [],
+    "layout_brief": "横版 16:9，见 prompt 视觉结构",
+    "style_brief": "paper-figure 顶会框架图风，中文",
+    "source_context": "Wenhao Lv et al., InfiniFS: An Efficient Metadata Service for Large-Scale Distributed Filesystems, FAST 2022"
+  }
+}

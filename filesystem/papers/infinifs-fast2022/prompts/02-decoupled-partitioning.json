@@ -1,0 +1,28 @@
+{
+  "prompt": "【类型】机制拆解图（三段：问题 → 拆分 → 分组分片）\n【主题】一个目录的元数据为什么要拆成两半\n【视觉结构】横版，左中右三段\n- 左段 \"已有做法的两难\"（较窄，橙色强调）：上下两个小对比框\n  上：\"细粒度哈希（IndexFS/HopsFS/Tectonic）：均衡 ✓ 局部性 ✗ → 频繁分布式锁/事务\"\n  下：\"子树划分（CephFS/AFS）：局部性 ✓ 均衡 ✗ → 热点子树\"\n  底部一句：根因 \"把目录元数据当成一个整体\"\n- 中段 \"解耦\"（核心）：一个目录 C 的元数据方块被一刀切成两半：\n  左半深蓝 \"访问元数据：name / ID / perm\"（用于走路径）\n  右半浅蓝 \"内容元数据：entry list / timestamps\"（与子项相关）\n- 右段 \"分组 + 分片\"：一棵小目录树 A → B、C，C 下有 f1、f2\n  画出三个\"每目录组\"彩色虚线框：组(C) 包含 \"C 的内容元数据 + f1 + f2 + C 的子目录的访问元数据\"\n  三个组分别落到 \"MS0\"、\"MS1\" 两台服务器，箭头上标 \"hash(目录 ID)，一致性哈希\"\n  组(C) 旁标 \"create f3 / readdir C：单服务器本地事务\"\n- 底部一行 KV 表（Table 2）三格：\n  \"目录访问元数据：key ⟨pid, name⟩ → id, perm，按 pid 分区\"\n  \"目录内容元数据：key ⟨id⟩ → entry list, timestamps，按 id 分区\"\n  \"文件元数据：key ⟨pid, name⟩ → 文件元数据，按 pid 分区\"\n- 右下角徽章：\"readdir + 文件 create/delete/open/close/stat 约占全部操作 90%，均为单服务器\"\n【语言】中文（英文术语、变量名、函数名按原样保留，不要改写拼写）\n【必须出现的标签】访问元数据、内容元数据、name / ID / perm、entry list / timestamps、按目录 ID 哈希、⟨pid, name⟩、⟨id⟩、单服务器事务、约 90% 操作\n【风格】paper-figure：像 FAST/OSDI 顶会论文中重新设计过的高质量方法总览图。纯白或极浅灰底；干净的矢量感模块（圆角矩形、分组框、键值小格、编号步骤圆点）；无衬线字体短标签；黑/深灰为主色，只用两个强调色：深蓝（InfiniFS 的核心设计/关键路径）与橙色（问题、热点、对比项）；主路径箭头粗、辅助箭头细；主体图解占画面 75%-85%，信息密度高但不拥挤；右下角小号页码。\n【禁止】不要手绘风、不要蓝底白线工程图纸风、不要 3D 渲染、不要照片写实、不要渐变和过饱和色；不要营销海报或 PPT 封面感；不要大段说明文字；不要随机英文或拼写变体；不要水印；不要复刻论文原图布局。\n页码：3/8",
+  "negativePrompt": "手绘，涂鸦，蓝图风，3D渲染，照片写实，渐变，过饱和，海报风，水印，模糊文字，错乱标签，随机英文，拼写错误，大面积空白",
+  "aspectRatio": "16:9",
+  "imageSize": "1K",
+  "caption": "访问/内容解耦分区：同时获得局部性与负载均衡",
+  "intent": "把目录元数据拆成访问元数据（名字、ID、权限，随父目录）和内容元数据（entry list、时间戳，随子项），以目录为单位成组后按目录 ID 哈希分片",
+  "figure_spec": {
+    "figure_kind": "mechanism schematic",
+    "caption": "访问/内容解耦分区：同时获得局部性与负载均衡",
+    "communicative_intent": "把目录元数据拆成访问元数据（名字、ID、权限，随父目录）和内容元数据（entry list、时间戳，随子项），以目录为单位成组后按目录 ID 哈希分片",
+    "required_labels": [
+      "访问元数据",
+      "内容元数据",
+      "name / ID / perm",
+      "entry list / timestamps",
+      "按目录 ID 哈希",
+      "⟨pid, name⟩",
+      "⟨id⟩",
+      "单服务器事务",
+      "约 90% 操作"
+    ],
+    "forbidden_labels": [],
+    "layout_brief": "横版 16:9，见 prompt 视觉结构",
+    "style_brief": "paper-figure 顶会框架图风，中文",
+    "source_context": "Wenhao Lv et al., InfiniFS: An Efficient Metadata Service for Large-Scale Distributed Filesystems, FAST 2022"
+  }
+}

@@ -4,11 +4,13 @@
 >
 > 机构：清华大学计算机系（BNRist）、厦门大学信息学院、阿里巴巴集团
 >
-> 链接：<https://www.usenix.org/conference/fast22/presentation/lv> ；PDF：<https://www.usenix.org/system/files/fast22-lv.pdf>
+> 链接：<https://www.usenix.org/conference/fast22/presentation/lv> ；PDF：<https://www.usenix.org/system/files/fast22-lv.pdf>（本地副本：[fast22-lv.pdf](fast22-lv.pdf)）
 >
 > 精读日期：2026-11-21。文中**数字、表格与机制描述均摘自论文原文**（标注所在章节）；标注"解读"的段落是本文作者的分析与推论，不是论文原话。
 >
-> 相关文档：[元数据扩展性综述中的 InfiniFS 小节](metadata-scalability.md#22-infinifs-an-efficient-metadata-service-for-large-scale-distributed-filesystemsfast-2022)、[Tectonic（FAST 2021）精读](tectonic-fast2021/deep-read.md)（InfiniFS 的主要对照对象之一）、[论文清单](essential-papers-2000-2026.md)。
+> 图解：文中 8 张 paper-figure 风格图解由 Codex CLI 内置 imagegen 依据 `prompts/*.json` 生成，放在对应章节；总索引见[附录：图解索引](#附录图解索引)，只看图的快速版见[图解](README.md)。
+>
+> 相关文档：[元数据扩展性综述中的 InfiniFS 小节](../metadata-scalability.md#22-infinifs-an-efficient-metadata-service-for-large-scale-distributed-filesystemsfast-2022)、[Tectonic（FAST 2021）精读](../tectonic-fast2021/deep-read.md)（InfiniFS 的主要对照对象之一）、[论文清单](../essential-papers-2000-2026.md)。
 
 ## 目录
 
@@ -24,10 +26,15 @@
 - [9. 评估](#9-评估)
 - [10. 与相关工作的对比](#10-与相关工作的对比)
 - [11. 整体总结](#11-整体总结)
+- [附录：图解索引](#附录图解索引)
 
 ---
 
 ## 0. 一页速览
+
+![图解：封面](00-cover.png)
+
+> **图解**：三大挑战（局部性与均衡不可兼得、深路径解析慢、近根热点）各对应一项技术；千亿文件下性能稳定。
 
 **一句话**：InfiniFS 是面向"单实例覆盖整个数据中心、百亿到千亿文件"场景的分布式文件系统元数据服务。它把目录元数据拆成**访问元数据**（名字、ID、权限）和**内容元数据**（目录项列表、时间戳），前者跟父目录放一起、后者跟子项放一起，再按目录 ID 一致性哈希分区，同时得到局部性和负载均衡；用**可预测的目录 ID** 让客户端并行解析整条路径；用**客户端乐观缓存 + 服务端惰性失效**消除近根热点。
 
@@ -52,7 +59,7 @@
 论文指出，当前数据中心通常由许多较小的文件系统集群组成（§2.1）：
 
 - **阿里云**维护着近**数千个**盘古（Pangu）文件系统实例，合计支撑数据中心内数百亿文件；
-- **Facebook** 在单个数据中心需要很多个 HDFS 集群，因为受元数据限制，每个 HDFS 集群最多支持约 **1 亿**文件；后来用 Tectonic 把小集群整合成单一实例（见 [Tectonic 精读](tectonic-fast2021/deep-read.md)）。
+- **Facebook** 在单个数据中心需要很多个 HDFS 集群，因为受元数据限制，每个 HDFS 集群最多支持约 **1 亿**文件；后来用 Tectonic 把小集群整合成单一实例（见 [Tectonic 精读](../tectonic-fast2021/deep-read.md)）。
 
 ### 1.2 单一大文件系统的好处（§2.1）
 
@@ -180,6 +187,10 @@ pie showData
 
 ## 4. 总体架构
 
+![图解：架构总览](01-architecture.png)
+
+> **图解**：客户端库做推测式路径解析并缓存访问元数据；元数据服务器按目录 ID 一致性哈希分片，KV 存储 + 失效列表；中心 rename 协调器只处理罕见的目录 rename。图中以 stat(/A/B/file) 为例标出四步路径。
+
 ```mermaid
 flowchart TB
     subgraph Clients["客户端"]
@@ -217,6 +228,10 @@ flowchart TB
 ---
 
 ## 5. 访问-内容解耦分区
+
+![图解：访问/内容解耦分区](02-decoupled-partitioning.png)
+
+> **图解**：目录元数据拆成访问元数据（name/ID/perm，随父目录）与内容元数据（entry list/timestamps，随子项），以目录为单位成组后按目录 ID 哈希分片；下方为论文表 2 的 KV 模式。
 
 ### 5.1 根本原因：把目录元数据当成一个整体（§3.2）
 
@@ -310,13 +325,17 @@ flowchart LR
 
 **解读**：解耦的本质是把"目录"这个对象沿着它的两种用途劈开：**作为孩子**被父目录列出、被路径解析访问（访问元数据），**作为父亲**容纳子项（内容元数据）。劈开后，每个文件操作需要的东西都落在"父目录的内容组"里。代价被转移到了目录操作上：mkdir、rmdir、statdir 都要跨两台服务器。负载里文件操作占 95.8%，而目录写操作极少，所以划算。
 
-**解读（与 Tectonic 的关系）**：对照 [Tectonic 精读](tectonic-fast2021/deep-read.md#42-三层元数据-schema论文表-1) 可以发现，Tectonic 的 Name 层用 `(dir_id, subdirname) → subdir_info, subdir_id`、按 `dir_id` 分片，在"子目录项跟着父目录分片"这一点上已经与 InfiniFS 的访问元数据布局相似。InfiniFS 的差别在于：把目录时间戳等内容元数据也明确地组织进来，并把这种分组作为系统化的设计原则提出；更重要的增量是后面两项——推测解析和乐观缓存。论文在实验中把"按目录粒度分区但没有三项特性"的系统作为 Baseline，并说明它类似 IndexFS、HopsFS 和 Tectonic（§5.3）。
+**解读（与 Tectonic 的关系）**：对照 [Tectonic 精读](../tectonic-fast2021/deep-read.md#42-三层元数据-schema论文表-1) 可以发现，Tectonic 的 Name 层用 `(dir_id, subdirname) → subdir_info, subdir_id`、按 `dir_id` 分片，在"子目录项跟着父目录分片"这一点上已经与 InfiniFS 的访问元数据布局相似。InfiniFS 的差别在于：把目录时间戳等内容元数据也明确地组织进来，并把这种分组作为系统化的设计原则提出；更重要的增量是后面两项——推测解析和乐观缓存。论文在实验中把"按目录粒度分区但没有三项特性"的系统作为 Baseline，并说明它类似 IndexFS、HopsFS 和 Tectonic（§5.3）。
 
 ---
 
 ## 6. 推测式路径解析
 
 ### 6.1 可预测的目录 ID（§3.3.1）
+
+![图解：可预测的目录 ID](03-predictable-id.png)
+
+> **图解**：ID = h(出生父目录 ID, 名字, 版本号)；rename 只改访问元数据的 key、ID 不变；首次 rename 记录 RL 与 BP，删除时经 BP 擦除 RL（对应论文图 4）。
 
 关键思想：让客户端**只凭路径字符串就能算出**每个中间目录的 ID，于是可以同时发出所有 lookup。
 
@@ -379,6 +398,10 @@ flowchart TB
 
 ### 6.2 并行解析（§3.3.2）
 
+![图解：推测式并行路径解析](04-speculative-resolution.png)
+
+> **图解**：朴素解析需 N−1 次串行 RPC；推测式解析本地算出全部中间 ID 后并行查找，约 1 RTT；猜错时服务器返回真实 ID，下一轮从该目录继续，约 2 RTT（对应论文图 5、图 15）。
+
 1. **预测 ID**：客户端从路径（或子路径）的根 ID 出发，以版本号 0 重建出生三元组并计算哈希，推出所有中间目录的 ID，再拼出每个路径分量的 key；
 2. **并行查询**：同时向各中间目录所在服务器发 lookup。每个请求检查访问权限，并把推测的 ID 与服务器上存储的 ID 比较；不一致时**返回真实 ID**；
 3. 重复 1、2，直到解析完成。
@@ -423,6 +446,10 @@ flowchart LR
 ---
 
 ## 7. 乐观访问元数据缓存与惰性失效
+
+![图解：乐观缓存与惰性失效](05-optimistic-cache.png)
+
+> **图解**：左：目录 rename 经协调器分配版本号并广播到各服务器的 Inv. List；右：客户端带版本号发请求，服务器只比对更新的 rename，冲突则中止并返回新记录；底部与 lease 对比（对应论文图 7）。
 
 ### 7.1 缓存组织（§3.4）
 
@@ -495,6 +522,10 @@ sequenceDiagram
 ---
 
 ## 8. 一致性：孤儿环与事务
+
+![图解：孤儿环与三类事务](06-consistency.png)
+
+> **图解**：两个元数据不相交的并发 rename 形成 B→C→E→F→B 的孤儿环，由 rename 协调器的 renaming graph 预先检测；右侧为单服务器事务、两服务器 2PC、目录 rename 三类事务（对应论文图 8、§4.2）。
 
 ### 8.1 孤儿环（§4.1）
 
@@ -589,6 +620,10 @@ xychart-beta
 - InfiniFS 延迟低于 IndexFS、CephFS、HopsFS：IndexFS 和 HopsFS 缓存未命中时要递归 RPC 解析路径；CephFS 和 HopsFS 分别通过外部分布式对象存储和 MySQL NDB 存元数据，软件栈更深。
 
 ### 9.4 因素分析（§5.3，图 11）
+
+![图解：关键结果](07-results.png)
+
+> **图解**：左：逐项叠加设计后文件 create 的延迟与吞吐（路径解析从 72% ≈ 9 RTT 降至 < 1 RTT，吞吐升至 3.3M ops/s）；右：1000 亿文件下约 3.5M ops/s；底部为与 HopsFS、CephFS、LocoFS 的对比。
 
 Baseline 基于 InfiniFS 框架实现，**按目录粒度分区**（类似 IndexFS、HopsFS、Tectonic），但不带三项特性；在 32 台服务器上逐个叠加特性。延迟测试用 1 个客户端在深度 10 处建空文件；吞吐测试用 1024 个客户端。
 
@@ -688,11 +723,11 @@ quadrantChart
 
 | 系统 | 与 InfiniFS 的关系 |
 |------|--------------------|
-| [Tectonic（FAST 2021）](tectonic-fast2021/deep-read.md) | 同为"一个数据中心一个文件系统"的动机；Tectonic 按层（Name / File / Block）和 ID 哈希分片，路径解析逐级串行，不提供跨目录原子 rename。InfiniFS 的 Baseline 即类似这种按目录粒度分区的设计 |
-| CFS（EuroSys 2023，百度） | 后继工作：在类似的元数据拆分基础上，用"裁剪临界区"让更多操作避免分布式事务，论文报告吞吐比 InfiniFS 高 1.22–4.10 倍（见 [元数据扩展性综述](metadata-scalability.md)） |
-| SingularFS（ATC 2023，清华） | 同一团队的另一条路线：单台元数据服务器 + PM + 精细并发控制，把"分布式协调"整个避开；访问/时间戳拆分与元数据分组沿用了 InfiniFS 的思路，只是分到 NUMA 节点而非服务器（精读：[singularfs-atc2023.md](singularfs-atc2023.md)） |
-| Mantle（SOSP 2025）、HMFS（SoCC 2025） | Mantle 用集中式轻量索引（IndexNode）加速路径解析；HMFS 沿用本文的按目录分区，把存储引擎换成 PM 哈希表 + 目录内链表（见 [Mantle 精读](mantle-sosp2025.md)、[HMFS 精读](hmfs-socc2025.md)） |
-| FalconFS（NSDI 2026） | 面向 AI 负载，同样关注深路径解析和近根热点，采用无状态客户端 + 服务端路径解析的不同取舍（精读：[falconfs-nsdi2026.md](falconfs-nsdi2026.md)） |
+| [Tectonic（FAST 2021）](../tectonic-fast2021/deep-read.md) | 同为"一个数据中心一个文件系统"的动机；Tectonic 按层（Name / File / Block）和 ID 哈希分片，路径解析逐级串行，不提供跨目录原子 rename。InfiniFS 的 Baseline 即类似这种按目录粒度分区的设计 |
+| CFS（EuroSys 2023，百度） | 后继工作：在类似的元数据拆分基础上，用"裁剪临界区"让更多操作避免分布式事务，论文报告吞吐比 InfiniFS 高 1.22–4.10 倍（见 [元数据扩展性综述](../metadata-scalability.md)） |
+| SingularFS（ATC 2023，清华） | 同一团队的另一条路线：单台元数据服务器 + PM + 精细并发控制，把"分布式协调"整个避开；访问/时间戳拆分与元数据分组沿用了 InfiniFS 的思路，只是分到 NUMA 节点而非服务器（精读：[singularfs-atc2023.md](../singularfs-atc2023.md)） |
+| Mantle（SOSP 2025）、HMFS（SoCC 2025） | Mantle 用集中式轻量索引（IndexNode）加速路径解析；HMFS 沿用本文的按目录分区，把存储引擎换成 PM 哈希表 + 目录内链表（见 [Mantle 精读](../mantle-sosp2025.md)、[HMFS 精读](../hmfs-socc2025.md)） |
+| FalconFS（NSDI 2026） | 面向 AI 负载，同样关注深路径解析和近根热点，采用无状态客户端 + 服务端路径解析的不同取舍（精读：[falconfs-nsdi2026.md](../falconfs-nsdi2026.md)） |
 
 ---
 
@@ -774,12 +809,31 @@ flowchart LR
 
 ---
 
+## 附录：图解索引
+
+| # | 图 | 所在章节 |
+|---|----|----------|
+| 00 | [封面](00-cover.png) | 0. 一页速览 |
+| 01 | [架构总览](01-architecture.png) | 4. 总体架构 |
+| 02 | [访问/内容解耦分区](02-decoupled-partitioning.png) | 5. 访问-内容解耦分区 |
+| 03 | [可预测的目录 ID](03-predictable-id.png) | 6.1 可预测的目录 ID（§3.3.1） |
+| 04 | [推测式并行路径解析](04-speculative-resolution.png) | 6.2 并行解析（§3.3.2） |
+| 05 | [乐观缓存与惰性失效](05-optimistic-cache.png) | 7. 乐观访问元数据缓存与惰性失效 |
+| 06 | [孤儿环与三类事务](06-consistency.png) | 8. 一致性：孤儿环与事务 |
+| 07 | [关键结果](07-results.png) | 9.4 因素分析（§5.3，图 11） |
+
+- 风格：paper-figure · 中文 · 16:9；作图规格见 `prompts/*.json`（每页的布局、必须标签、禁止项）。图为本仓库重新绘制的示意图，非论文原图。
+- 生成：Codex CLI 内置 imagegen。07 图首版把各阶段"元数据处理"时间画成逐步缩短并误写"100 亿"，已按论文图 11、图 12 修正提示词重新生成。
+- 已知小瑕疵：02 图中组 (C) 的连线同时指向 MS0 与 MS1，实际一个组只落在一台服务器上；07 图左半为示意比例，非论文图 11 的精确数值。
+
+---
+
 ## 参考
 
 - Wenhao Lv, Youyou Lu, Yiming Zhang, Peile Duan, Jiwu Shu. *InfiniFS: An Efficient Metadata Service for Large-Scale Distributed Filesystems*. USENIX FAST 2022. <https://www.usenix.org/conference/fast22/presentation/lv>
-- Satadru Pan et al. *Facebook's Tectonic Filesystem: Efficiency from Exascale*. USENIX FAST 2021. 本仓库精读：[tectonic-fast2021/deep-read.md](tectonic-fast2021/deep-read.md)
+- Satadru Pan et al. *Facebook's Tectonic Filesystem: Efficiency from Exascale*. USENIX FAST 2021. 本仓库精读：[tectonic-fast2021/deep-read.md](../tectonic-fast2021/deep-read.md)
 - Siyang Li et al. *LocoFS: A Loosely-Coupled Metadata Service for Distributed File Systems*. SC 2017.
 - Kai Ren et al. *IndexFS: Scaling File System Metadata Performance with Stateless Caching and Bulk Insertion*. SC 2014.
 - Salman Niazi et al. *HopsFS: Scaling Hierarchical File System Metadata Using NewSQL Databases*. USENIX FAST 2017.
 - Sage A. Weil et al. *Ceph: A Scalable, High-Performance Distributed File System*. OSDI 2006.
-- Yiduo Wang et al. *CFS: Scaling Metadata Service for Distributed File System via Pruned Scope of Critical Sections*. EuroSys 2023.（后续工作，本仓库精读：[cfs-eurosys2023.md](cfs-eurosys2023.md)）
+- Yiduo Wang et al. *CFS: Scaling Metadata Service for Distributed File System via Pruned Scope of Critical Sections*. EuroSys 2023.（后续工作，本仓库精读：[cfs-eurosys2023.md](../cfs-eurosys2023.md)）

@@ -94,7 +94,7 @@ POSIX 语义要求逐级检查路径上每一级目录的存在性与权限。�
   - **存储引擎**：每台元数据服务器用本地 RocksDB 作 KV 后端，Thrift RPC 通信；目录分组按目录 ID 一致性哈希到服务器。
 - **关键实验结果**：吞吐较 HopsFS 高 73×、较 CephFS 高 23×；目录树规模达 **1000 亿文件**仍保持稳定性能与近线性扩展。
 - **局限性**：推测解析依赖 ID 生成规则，rename/迁移后推测失败率上升；跨分片操作仍需分布式事务；客户端缓存失效协议增加复杂度。
-- **逐节精读**：[infinifs-fast2022.md](infinifs-fast2022.md)
+- **逐节精读**：[infinifs-fast2022/deep-read.md](infinifs-fast2022/deep-read.md)
 - **设计启示**：access/content 元数据解耦是元数据服务表结构设计的高价值模式：inode 表可拆为 `dentry(parent_id, name) -> {id, mode, uid...}` 与 `dir_content(id) -> ...` 两类 KV，分别按 parent_id 和自身 id 分区。可预测目录 ID + 客户端并行 lookup 能显著降低深路径 open 延迟。
 
 ### 2.3 CFS: Scaling Metadata Service for Distributed File System via Pruned Scope of Critical Sections（EuroSys 2023）

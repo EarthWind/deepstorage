@@ -1,0 +1,27 @@
+{
+  "prompt": "【类型】机制图（左：问题演示；右：三类事务表）\n【主题】目录树怎样保持连通且无环\n【视觉结构】横版\n- 左半 \"孤儿环是怎么来的\"（四个小树快照从左到右，标 T1、C1、C2、T2）：\n  初始树：/ 下有 A 和 D；A → B → C；D → E → F\n  客户端 1：rename E 成为 C 的子目录（深蓝箭头）\n  客户端 2：rename B 成为 F 的子目录（橙色箭头）\n  两个操作涉及的元数据完全不相交，可以并行执行；结果 T2：B → C → E → F → B 形成环，与根断开，橙色标 \"孤儿环：环内文件不可访问\"\n  下方解法框（深蓝）：\"Rename Coordinator 维护 Renaming Graph（在途 rename 的源/目的路径），新 rename 执行前先检查是否成环\"\n- 右半 \"三类事务\"表格（三行）：\n  1 \"单服务器操作：readdir；文件 create/delete/open/close/stat/set_permission → KV 本地事务\"\n  2 \"两服务器操作：mkdir/rmdir/statdir、文件 rename → 两阶段提交，由其中一台服务器做协调者，双方写 WAL\"\n  3 \"目录 rename / set_permission → rename 协调器做 2PC 协调者，在提交阶段开头广播；协调器崩溃后重启重发广播，保证至少送达一次\"\n  每行左侧一个小图标表示涉及 1 台 / 2 台 / 协调器 + 全部服务器\n【语言】中文（英文术语、变量名、函数名按原样保留，不要改写拼写）\n【必须出现的标签】孤儿环、并发 rename、Renaming Graph、单服务器事务、两阶段提交、WAL、rename 协调器为 2PC 协调者、广播至少送达一次\n【风格】paper-figure：像 FAST/OSDI 顶会论文中重新设计过的高质量方法总览图。纯白或极浅灰底；干净的矢量感模块（圆角矩形、分组框、键值小格、编号步骤圆点）；无衬线字体短标签；黑/深灰为主色，只用两个强调色：深蓝（InfiniFS 的核心设计/关键路径）与橙色（问题、热点、对比项）；主路径箭头粗、辅助箭头细；主体图解占画面 75%-85%，信息密度高但不拥挤；右下角小号页码。\n【禁止】不要手绘风、不要蓝底白线工程图纸风、不要 3D 渲染、不要照片写实、不要渐变和过饱和色；不要营销海报或 PPT 封面感；不要大段说明文字；不要随机英文或拼写变体；不要水印；不要复刻论文原图布局。\n页码：7/8",
+  "negativePrompt": "手绘，涂鸦，蓝图风，3D渲染，照片写实，渐变，过饱和，海报风，水印，模糊文字，错乱标签，随机英文，拼写错误，大面积空白",
+  "aspectRatio": "16:9",
+  "imageSize": "1K",
+  "caption": "一致性：孤儿环检测与三类事务",
+  "intent": "两个互不相干的并发目录 rename 可能形成孤儿环；中心 rename 协调器用 renaming graph 检测；元数据操作按涉及服务器数分为三类事务",
+  "figure_spec": {
+    "figure_kind": "mechanism schematic",
+    "caption": "一致性：孤儿环检测与三类事务",
+    "communicative_intent": "两个互不相干的并发目录 rename 可能形成孤儿环；中心 rename 协调器用 renaming graph 检测；元数据操作按涉及服务器数分为三类事务",
+    "required_labels": [
+      "孤儿环",
+      "并发 rename",
+      "Renaming Graph",
+      "单服务器事务",
+      "两阶段提交",
+      "WAL",
+      "rename 协调器为 2PC 协调者",
+      "广播至少送达一次"
+    ],
+    "forbidden_labels": [],
+    "layout_brief": "横版 16:9，见 prompt 视觉结构",
+    "style_brief": "paper-figure 顶会框架图风，中文",
+    "source_context": "Wenhao Lv et al., InfiniFS: An Efficient Metadata Service for Large-Scale Distributed Filesystems, FAST 2022"
+  }
+}

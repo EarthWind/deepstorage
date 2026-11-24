@@ -12,7 +12,7 @@
 >
 > 相关文档：
 > - [Fisc（FAST 2023）精读](fisc-fast2023.md)：同一会议、同一团队，盘古之上的云原生文件系统接入层。
-> - [InfiniFS（FAST 2022）精读](infinifs-fast2022.md)：盘古元数据服务采用的并行路径解析等技术来源。
+> - [InfiniFS（FAST 2022）精读](infinifs-fast2022/deep-read.md)：盘古元数据服务采用的并行路径解析等技术来源。
 > - [工业界生产系统中的盘古小节](industry-production-systems.md#3-alibaba-pangu-more-than-capacityfast-2023)。
 > - [Tectonic（FAST 2021）精读](tectonic-fast2021/deep-read.md)：同为"重客户端"的超大规模生产文件系统。
 > - [EBS Glory（FAST 2024）精读](ebs-fast2024.md)：建在盘古之上的阿里云块存储三代演进，可与本文流量放大、FPGA 压缩部分对照。
@@ -259,7 +259,7 @@ sequenceDiagram
     Note over C: 写失败时直接切换到预取的备用 chunk
 ```
 
-**解读**：可预测目录 ID 与 InfiniFS 的"基于出生三元组哈希的推测式路径解析"是同一思路：只要 ID 能由父目录和名字算出来，客户端就可以并行查询路径上的每一级，而不必逐级等待。详见 [InfiniFS 精读](infinifs-fast2022.md)。
+**解读**：可预测目录 ID 与 InfiniFS 的"基于出生三元组哈希的推测式路径解析"是同一思路：只要 ID 能由父目录和名字算出来，客户端就可以并行查询路径上的每一级，而不必逐级等待。详见 [InfiniFS 精读](infinifs-fast2022/deep-read.md)。
 
 ---
 
@@ -872,7 +872,7 @@ flowchart TB
 
 - Qiang Li et al. *More Than Capacity: Performance-oriented Evolution of Pangu in Alibaba*. USENIX FAST 2023. <https://www.usenix.org/conference/fast23/presentation/li-qiang-deployed>
 - Qiang Li et al. *Fisc: A Large-scale Cloud-native-oriented File System*. USENIX FAST 2023.（本仓库精读：[fisc-fast2023.md](fisc-fast2023.md)）
-- Wenhao Lv et al. *InfiniFS: An Efficient Metadata Service for Large-Scale Distributed Filesystems*. USENIX FAST 2022.（本仓库精读：[infinifs-fast2022.md](infinifs-fast2022.md)）
+- Wenhao Lv et al. *InfiniFS: An Efficient Metadata Service for Large-Scale Distributed Filesystems*. USENIX FAST 2022.（本仓库精读：[infinifs-fast2022/deep-read.md](infinifs-fast2022/deep-read.md)）
 - Su Zhou et al. *SMRSTORE: A Storage Engine for Cloud Object Storage on HM-SMR Drives*. USENIX FAST 2023.
 - Ruiming Lu et al. *Perseus: A Fail-Slow Detection Framework for Cloud Storage Systems*. USENIX FAST 2023.
 - Yixiao Gao et al. *When Cloud Storage Meets RDMA*. USENIX NSDI 2021.
