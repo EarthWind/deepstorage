@@ -46,24 +46,25 @@
 ## 2. Assise: Performance and Availability via Client-local NVM in a Distributed File System
 
 - **会议**：OSDI 2020（USENIX）
-- **作者/机构**：Thomas E. Anderson（Univ. of Washington）、Marco Canini（KAUST）、Jongyul Kim（KAIST）、Dejan Kostić & Waleed Reda（KTH）、Youngjin Kwon（KAIST）、Simon Peter & Emmett Witchel（UT Austin）等
+- **作者/机构**：Thomas E. Anderson、Henry N. Schuh（Univ. of Washington）、Marco Canini（KAUST）、Jongyul Kim、Youngjin Kwon（KAIST）、Dejan Kostić、Waleed Reda（KTH；Reda 为主要学生作者，兼 UCLouvain）、Simon Peter、Emmett Witchel（UT Austin），共 9 人
 - **链接**：https://www.usenix.org/conference/osdi20/presentation/anderson ；代码 https://github.com/ut-osa/assise
 - **目标硬件**：客户端本地 Intel Optane DC PMem + RDMA 网络
 
 ### 核心设计
 
 - 颠覆"存储在远端服务器"的传统 DFS 模型：把 PM 放在**客户端本地**，计算与存储 colocate。
-- **数据路径**：应用通过用户态库文件系统（基于 Strata 演化）直接写 process-local 的 PM 更新日志（无内核、无网络）；后台按链式复制（chain replication）经 RDMA 把日志复制到其他节点的 PM，再 digest 到共享区/冷层（SSD）。读优先命中 process-local → socket-local → client-local PM，最大化本地性。
+- **数据路径**：应用通过用户态库文件系统 LibFS（基于 Strata 演化）直接写 process-local 的 PM 更新日志（无内核、无网络）；pessimistic 模式在 `fsync` 时、optimistic 模式在 `dsync` 或日志驱逐时，经 RDMA write-with-immediate 把日志链式复制到热备副本的 PM；日志满时按 LRU 驱逐到每 socket 一个的 SharedFS 守护进程的共享缓存，再到冷层（SSD）。读依次查进程本地读写缓存 → 本节点 SharedFS → 温副本远端 PM 与冷存储（并行）。
 - **缓存/一致性**：核心是 CC-NVM——一个**持久、可线性化、可崩溃恢复**的分布式 coherence 协议，把客户端本地 PM 当作 linearizable cache 管理；一致性粒度是 IO 操作（操作日志）而非固定大小的块，显著降低 false sharing 与协议流量；提供 prefix crash consistency。
 - **可用性**：热备节点（failover replica）在其本地 PM 中持有最新日志副本，故障切换时无需从远端重建缓存，实现亚秒级 failover。
 
 ### 关键实验结果
 
-- 对比 Ceph/BlueStore、NFS、Octopus：写延迟最多降低 22×，吞吐最多提高 56×，failover 最快 103×，扩展性好 6×；LevelDB、Postfix、Filebench 等应用显著受益。
+- 对比 Ceph/BlueStore、NFS、Octopus：LevelDB 同步写延迟比 Ceph 低 22×；Varmail 吞吐约为 Ceph 的 55×（摘要称 56×）；LevelDB 热备切换 230 ms 对 Ceph 23.7 s（103×）；原子文件操作扩展到 Ceph 的 554×、Orion 仿真的 69×；Postfix 最多为 Ceph 的 5.6×；MinuteSort 比 NFS 快 2.2×。
+- **逐节精读**：[assise-osdi2020.md](assise-osdi2020.md)
 
 ### 局限
 
-- 强依赖 Optane PMem（已停产）；客户端本地放持久数据改变了运维模型（客户端节点故障=数据副本故障）；用户态 libfs + 共享内核态 kernfs 的架构侵入性强，POSIX 兼容与多进程共享复杂。
+- 强依赖 Optane PMem（已停产）；客户端本地放持久数据改变了运维模型（客户端节点故障=数据副本故障）；副本与子树策略由管理员手工配置；后台发布与复制占用大量客户端 CPU（LineFS 测得 100GbE 下约 5 核）；用户态 LibFS + 每 socket SharedFS 守护进程的架构侵入性强（Strata 中对应组件称 KernFS）。
 
 ### 设计启示
 
