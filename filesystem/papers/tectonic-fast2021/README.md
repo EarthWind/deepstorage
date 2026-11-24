@@ -4,7 +4,7 @@
 >
 > 机构：Facebook（现 Meta）、Princeton University、Columbia University
 >
-> 链接：<https://www.usenix.org/conference/fast21/presentation/pan> ；PDF：<https://www.usenix.org/system/files/fast21-pan.pdf>
+> 链接：<https://www.usenix.org/conference/fast21/presentation/pan> ；PDF：<https://www.usenix.org/system/files/fast21-pan.pdf>（本地副本：[fast21-pan.pdf](fast21-pan.pdf)）
 >
 > 精读日期：2026-11-16。文中**数字、表格与机制描述均摘自论文原文**（标注所在章节）；标注"解读"的段落是本文作者的分析与推论，不是论文原话。
 >
