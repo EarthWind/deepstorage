@@ -4,7 +4,7 @@
 
 - 论文：Satadru Pan et al., *Facebook's Tectonic Filesystem: Efficiency from Exascale*, FAST 2021 — <https://www.usenix.org/conference/fast21/presentation/pan>（[PDF](https://files.usenix.org/s3fs-public/cdn/fast21-pan.pdf)，本地副本：[fast21-pan.pdf](fast21-pan.pdf)）
 - 精读文档：[deep-read.md](deep-read.md)（逐章精读，相关图解已嵌入对应章节）
-- 风格：sketchnote · 中文 · 16:9 · 用于论文阅读笔记
+- 风格：paper-figure · 中文 · 16:9 · 用于论文阅读笔记
 - 页数：10（封面 + 9 页机制 / 结果）
 - 生成方式：`prompts/*.json` 为每页作图规格；图片由 Codex CLI 内置 imagegen 生成。也可用 `bash generate.sh [页号...]` 走 Giiisp 重新生成（需 `GIIISP_AUTH_TOKEN`）。
 
@@ -66,7 +66,7 @@
 
 ![关键结果](09-results.png)
 
-**讲解**：代表性生产集群的规模是 1590 PB 容量、107 亿文件、150 亿 block、4208 个存储节点。衡量 IO 用的是"磁盘时间"，因为它能同时公平地计量 blob 的小 IO（受 IOPS 限制）和数仓的大 IO（受带宽限制）。数仓峰值需求 0.57，超过它自身的供给 0.51；blob 需求只有 0.12，而供给是 0.49。合并后数仓可以借用 blob 闲置的磁盘时间；如果不合并，数仓需要多备约 17% 的磁盘。Blob 的读写延迟与 Haystack 相当。元数据方面，只有约 1% 的 Name 层 shard 碰到每 shard 10K QPS 的上限，靠退避重试化解。
+**讲解**：代表性生产集群的规模是 1590 PB 容量、107 亿文件、150 亿 block、4208 个存储节点。衡量 IO 用的是"磁盘时间"，因为它能同时公平地计量 blob 的小 IO（受 IOPS 限制）和数仓的大 IO（受带宽限制）。三个日峰值里，数仓需求分别是 0.60、0.54、0.57，都超过它自身的供给 0.51；blob 需求只有 0.12、0.14、0.11，而供给是 0.49。合并后的总需求 0.72、0.68、0.68，始终低于总供给 1.00。合并后数仓可以借用 blob 闲置的磁盘时间；如果不合并，数仓需要多备约 17% 的磁盘。Blob 的读写延迟与 Haystack 相当。元数据方面，只有约 1% 的 Name 层 shard 碰到每 shard 10K QPS 的上限，靠退避重试化解。
 
 ## 总结：3 个核心要点
 

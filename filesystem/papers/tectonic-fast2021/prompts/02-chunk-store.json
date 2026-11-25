@@ -1,14 +1,14 @@
 {
-  "prompt": "【类型】机制拆解图（三栏）\n【主题】数据如何落盘：文件 → Block → Chunk\n【视觉结构】\n- 左栏\"层级\"：一个长条\"文件\"被切成若干段\"Block\"，再把一个 Block 放大成多个小方块\"Chunk\"。旁注：\"Chunk Store 扁平、只认 chunk，不知道 block/文件\"\n- 中栏\"每个 Block 单独选持久性\"，上下两种：\n  上：RS(r,k) —— 一个 block 切成 r 个数据 chunk（蓝色）+ k 个校验 chunk（珊瑚红），例子 \"RS(10,4)=14 个 chunk\"\n  下：副本 —— block 原样复制 3 份（绿色）\n  所有 chunk 分别落在不同机架图标上，标注 \"不同故障域（机架）\"\n- 右栏\"Copyset\"：画一条打乱后的磁盘序列（编号小圆点 D7 D2 D15 D4 D11 ...），用括号框出连续 14 个 = \"一个 copyset\"；旁边写 \"内存中保留约 100 种一致洗牌，block ID 决定用哪一种\"\n  下方一个天平：左盘\"copyset 太多 → 多盘同时坏易丢数据\"，右盘\"copyset 太少 → 单盘坏时重建负载集中\"，中间写 \"维持固定数量\"\n【语言】中文（英文术语按原样保留，不要改写拼写）\n【必须出现的标签】文件、Block、Chunk、RS(r,k)、副本、故障域、Copyset、磁盘洗牌\n【风格】sketchnote 科研手抄报：明亮浅米白底(#FFF8EA)，黑色手绘线条，墨迹粗细变化；强调色只用深蓝/珊瑚红/橄榄绿/柔和黄色，清爽不过饱和；手绘感箭头；中文手写体但清晰可读；可少量放大镜、星号、便签、圈注等趣味符号，但服务理解；主体图解占画面75%-85%；右下角手写页码。\n【禁止】不要代码块、照片写实、3D渲染；不要旧羊皮纸、暗角、污渍、黄褐色复古调；不要大面积空白；不要随机英文或拼写变体；不要水印、广告风格、伪论文截图；不要图标题以外的长段正文。\n页码：3/10",
-  "negativePrompt": "水印，模糊文字，错乱标签，随机英文，拼写错误，旧羊皮纸，暗角，污渍，3D渲染，照片写实，大面积空白，广告风格",
+  "prompt": "【类型】机制拆解图（三栏）\n【主题】数据如何落盘：文件 → Block → Chunk\n【视觉结构】横版三栏，栏间细竖线分隔\n- 左栏 \"层级\"：一条长条 \"文件\" 被切成若干段 \"Block\"，其中一个 Block 放大为多个小方块 \"Chunk\"；栏底短标签 \"Chunk Store 扁平 · 只认 chunk，不知道 block / 文件\"\n- 中栏 \"每个 Block 单独选持久性\"，上下两种：\n  上：\"RS(r,k)\" —— 一个 block 切成 r 个深蓝数据 chunk + k 个橙色校验 chunk，示例 \"RS(10,4) = 14 个 chunk\"\n  下：\"副本\" —— block 原样复制 3 份（灰色）\n  所有 chunk 分别落到不同机架小框上，标 \"不同故障域（机架）\"\n- 右栏 \"Copyset\"：一排打乱后的磁盘编号小圆点（D7 D2 D15 D4 D11 D9 …），用括号框出连续 14 个 = \"一个 copyset\"；短标签 \"磁盘洗牌：内存中约 100 种一致洗牌，由 block ID 选择其一\"\n  下方一个左右权衡示意：左 \"copyset 太多 → 多盘同时故障易丢数据\"，右 \"copyset 太少 → 单盘故障时重建负载集中\"，中间深蓝标签 \"维持固定数量\"\n【语言】中文（英文术语、变量名按原样保留，不要改写拼写）\n【必须出现的标签】文件、Block、Chunk、RS(r,k)、副本、故障域、Copyset、磁盘洗牌\n【风格】paper-figure：像 FAST/OSDI 顶会论文中重新设计过的高质量方法总览图。纯白或极浅灰底；干净的矢量感模块（圆角矩形、分组框、键值小格、编号步骤圆点）；无衬线字体短标签；黑/深灰为主色，只用两个强调色：深蓝（Tectonic 的核心设计/关键路径）与橙色（问题、热点、对比项、校验/冗余部分）；需要区分类别时只用这两色的深浅和灰色；主路径箭头粗、辅助箭头细；主体图解占画面 75%-85%，信息密度高但不拥挤；右下角小号页码。\n【禁止】不要手绘风、不要便签纸、不要卡通小人和装饰性图标、不要蓝底白线工程图纸风、不要 3D 渲染、不要照片写实、不要渐变和过饱和色；不要营销海报或 PPT 封面感；不要大段说明文字；不要随机英文或拼写变体；不要水印；不要复刻论文原图布局。\n页码：3/10",
+  "negativePrompt": "手绘，涂鸦，便签纸，卡通，蓝图风，3D渲染，照片写实，渐变，过饱和，海报风，水印，模糊文字，错乱标签，随机英文，拼写错误，大面积空白",
   "aspectRatio": "16:9",
   "imageSize": "1K",
   "caption": "Chunk Store：扁平 chunk、按 block 定制持久性、copyset",
-  "intent": "chunk 组成 block，block 组成文件；每个 block 可选 RS 或副本；copyset 由磁盘洗牌序列的连续段组成",
+  "intent": "文件由 block 组成，block 由 chunk 组成；每个 block 单独选择 RS 或副本；chunk 按固定数量的 copyset 放置以平衡数据丢失概率与重建负载",
   "figure_spec": {
     "figure_kind": "mechanism schematic",
     "caption": "Chunk Store：扁平 chunk、按 block 定制持久性、copyset",
-    "communicative_intent": "chunk 组成 block，block 组成文件；每个 block 可选 RS 或副本；copyset 由磁盘洗牌序列的连续段组成",
+    "communicative_intent": "文件由 block 组成，block 由 chunk 组成；每个 block 单独选择 RS 或副本；chunk 按固定数量的 copyset 放置以平衡数据丢失概率与重建负载",
     "required_labels": [
       "文件",
       "Block",
@@ -21,7 +21,7 @@
     ],
     "forbidden_labels": [],
     "layout_brief": "横版 16:9，见 prompt 视觉结构",
-    "style_brief": "sketchnote 明亮科研手抄报，中文",
+    "style_brief": "paper-figure 顶会框架图风，中文",
     "source_context": "Pan et al., Facebook's Tectonic Filesystem: Efficiency from Exascale, FAST 2021"
   }
 }

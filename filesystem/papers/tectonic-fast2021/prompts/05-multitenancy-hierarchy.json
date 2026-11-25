@@ -1,14 +1,14 @@
 {
-  "prompt": "【类型】层级 + 流向图\n【主题】Tectonic 如何在多租户间分瞬时资源\n【视觉结构】\n- 左上小框 \"两类资源\"：存储容量 = 非瞬时，按租户硬配额，手动调整（锁图标）；磁盘 IOPS、元数据 QPS = 瞬时，实时自动分配（闪电图标）\n- 中央树状层级：集群 → 2 个租户（Blob 存储、数据仓库）→ 各自若干 TrafficGroup 小盒子（如\"生产流量\"\"后台 GC\"），每个小盒子贴彩色标签 Gold（金）/Silver（银灰）/Bronze（铜）\n  旁注：\"不按几百个应用管，只管约 50 个 TrafficGroup\"\n- 右侧\"空闲资源借用顺序\"：三级阶梯，水流从上往下：①本 TrafficGroup 自己的保证配额 → ②同租户其他 TrafficGroup（按 Gold>Silver>Bronze）→ ③其他租户的 TrafficGroup（同样按优先级）\n- 底部便签：借用来的流量取两方中较低的 TrafficClass —— \"保证节点上各优先级流量比例不变\"\n【语言】中文（英文术语按原样保留，不要改写拼写）\n【必须出现的标签】租户、TrafficGroup、TrafficClass、Gold、Silver、Bronze、保证配额、空闲资源\n【风格】sketchnote 科研手抄报：明亮浅米白底(#FFF8EA)，黑色手绘线条，墨迹粗细变化；强调色只用深蓝/珊瑚红/橄榄绿/柔和黄色，清爽不过饱和；手绘感箭头；中文手写体但清晰可读；可少量放大镜、星号、便签、圈注等趣味符号，但服务理解；主体图解占画面75%-85%；右下角手写页码。\n【禁止】不要代码块、照片写实、3D渲染；不要旧羊皮纸、暗角、污渍、黄褐色复古调；不要大面积空白；不要随机英文或拼写变体；不要水印、广告风格、伪论文截图；不要图标题以外的长段正文。\n页码：6/10",
-  "negativePrompt": "水印，模糊文字，错乱标签，随机英文，拼写错误，旧羊皮纸，暗角，污渍，3D渲染，照片写实，大面积空白，广告风格",
+  "prompt": "【类型】层级 + 流向图\n【主题】Tectonic 如何在多租户间分配瞬时资源\n【视觉结构】横版三区\n- 左上小框 \"两类资源\"：上行 \"存储容量 = 非瞬时 → 按租户硬配额，手动调整\"；下行 \"磁盘 IOPS、元数据 QPS = 瞬时 → 实时自动分配\"\n- 中央树状层级：根 \"集群\" → 两个 \"租户\"（\"Blob 存储\"、\"数据仓库\"）→ 各自若干 \"TrafficGroup\" 小方框（如 \"生产流量\"、\"后台 GC\"），每个小方框右上角一个小标签 \"Gold\" / \"Silver\" / \"Bronze\"（用深蓝由深到浅三档表示优先级）\n  树旁短标签 \"不按几百个应用管，只管约 50 个 TrafficGroup\"；\"TrafficClass = Gold / Silver / Bronze\"\n- 右侧 \"空闲资源借用顺序\"：三级阶梯自上而下，深蓝箭头依次连接：① \"本 TrafficGroup 的保证配额\" → ② \"同租户其他 TrafficGroup 的空闲资源（Gold > Silver > Bronze）\" → ③ \"其他租户的空闲资源（同样按优先级）\"\n- 底部一行：借来的流量取双方中较低的 TrafficClass —— \"保持节点上各优先级流量比例不变\"\n【语言】中文（英文术语、变量名按原样保留，不要改写拼写）\n【必须出现的标签】租户、TrafficGroup、TrafficClass、Gold、Silver、Bronze、保证配额、空闲资源\n【风格】paper-figure：像 FAST/OSDI 顶会论文中重新设计过的高质量方法总览图。纯白或极浅灰底；干净的矢量感模块（圆角矩形、分组框、键值小格、编号步骤圆点）；无衬线字体短标签；黑/深灰为主色，只用两个强调色：深蓝（Tectonic 的核心设计/关键路径）与橙色（问题、热点、对比项、校验/冗余部分）；需要区分类别时只用这两色的深浅和灰色；主路径箭头粗、辅助箭头细；主体图解占画面 75%-85%，信息密度高但不拥挤；右下角小号页码。\n【禁止】不要手绘风、不要便签纸、不要卡通小人和装饰性图标、不要蓝底白线工程图纸风、不要 3D 渲染、不要照片写实、不要渐变和过饱和色；不要营销海报或 PPT 封面感；不要大段说明文字；不要随机英文或拼写变体；不要水印；不要复刻论文原图布局。\n页码：6/10",
+  "negativePrompt": "手绘，涂鸦，便签纸，卡通，蓝图风，3D渲染，照片写实，渐变，过饱和，海报风，水印，模糊文字，错乱标签，随机英文，拼写错误，大面积空白",
   "aspectRatio": "16:9",
   "imageSize": "1K",
   "caption": "多租户资源共享：Tenant → TrafficGroup → TrafficClass",
-  "intent": "容量按租户硬隔离；IOPS/元数据 QPS 这类瞬时资源按约 50 个 TrafficGroup 分配，空闲资源按优先级依次借出",
+  "intent": "容量按租户硬配额；IOPS 与元数据 QPS 等瞬时资源按 TrafficGroup 保证配额并按优先级借用空闲资源",
   "figure_spec": {
     "figure_kind": "mechanism schematic",
     "caption": "多租户资源共享：Tenant → TrafficGroup → TrafficClass",
-    "communicative_intent": "容量按租户硬隔离；IOPS/元数据 QPS 这类瞬时资源按约 50 个 TrafficGroup 分配，空闲资源按优先级依次借出",
+    "communicative_intent": "容量按租户硬配额；IOPS 与元数据 QPS 等瞬时资源按 TrafficGroup 保证配额并按优先级借用空闲资源",
     "required_labels": [
       "租户",
       "TrafficGroup",
@@ -21,7 +21,7 @@
     ],
     "forbidden_labels": [],
     "layout_brief": "横版 16:9，见 prompt 视觉结构",
-    "style_brief": "sketchnote 明亮科研手抄报，中文",
+    "style_brief": "paper-figure 顶会框架图风，中文",
     "source_context": "Pan et al., Facebook's Tectonic Filesystem: Efficiency from Exascale, FAST 2021"
   }
 }

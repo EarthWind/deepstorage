@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 批量生成 Tectonic 图解（10 张，中文，sketchnote，16:9）。
+# 批量生成 Tectonic 图解（10 张，中文，paper-figure，16:9）。
 # 需要：GIIISP_AUTH_TOKEN（必需），DASHSCOPE_API_KEY（可选；缺失时跳过 VLM 语义复查）
 # 用法：bash generate.sh [页面ID前缀...]   例如：bash generate.sh 03 07
 set -euo pipefail

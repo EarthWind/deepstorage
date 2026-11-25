@@ -35,9 +35,6 @@ figcaption{color:var(--muted);font-size:.85rem;text-align:center;margin-top:.4re
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous"
   onload="renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}]})"></script>
-<!-- Mermaid -->
-<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js" integrity="sha384-WmdflGW9aGfoBdHc4rRyWzYuAjEmDwMdGdiPNacbwfGKxBW/SO6guzuQ76qjnSlr" crossorigin="anonymous"></script>
-<script>mermaid.initialize({startOnLoad:true,theme:'default',securityLevel:'loose'});</script>
 </head>
 <body>
 
@@ -99,18 +96,6 @@ figcaption{color:var(--muted);font-size:.85rem;text-align:center;margin-top:.4re
 <p>先看全貌。Tectonic 一个集群里只有两样东西有状态：存数据的 <strong>Chunk Store</strong> 和存目录树的 <strong>Metadata Store</strong>。剩下的组件全是无状态的，包括所有读写都要经过的 <strong>Client Library</strong>，以及做垃圾回收、修复、搬迁的后台服务。</p>
 
 <figure><img src="01-architecture.png" alt="Tectonic 整体架构图解"><figcaption>图解 1：Tectonic 架构。对应论文 Figure 2：Client Library 依次查 Name、File、Block 三层元数据，再直接读写存储节点。</figcaption></figure>
-
-<pre class="mermaid">
-flowchart LR
-    APP["Tenant<br/>Blob / Warehouse"] --> CL["Client Library<br/>stateless"]
-    CL -->|1 lookup dir| NL["Name layer"]
-    CL -->|2 list blocks| FL["File layer"]
-    CL -->|3 locate chunks| BL["Block layer"]
-    NL --- KV[("ZippyDB<br/>Paxos + RocksDB")]
-    FL --- KV
-    BL --- KV
-    CL -->|4 read or write chunks| CS[("Chunk Store<br/>36 HDD + 1 TB SSD per node")]
-</pre>
 
 <p>回到开头那张照片。上传时，Client Library 在 Name 层找到目录，在 File 层找到文件对应的 block，在 Block 层找到这个 block 的 chunk 放在哪几块盘上，然后直接把数据写给那几台存储节点。存储节点只认识 chunk，不知道什么是 block、什么是文件。这种"笨"恰恰是它能扩展到 EB 级的原因：chunk 的数量随节点数线性增长，没有任何全局结构需要随之膨胀。</p>
 
@@ -206,7 +191,7 @@ $$\text{disk time} = \sum_{\text{IO}} t_{\text{IO}}, \qquad \text{例：1 秒内
 
 <p>这张表的意思是：如果数仓单独一个集群，三天里每一个日峰值它都不够用（0.60、0.54、0.57 都超过 0.51），要多买约 <strong>17%</strong> 的硬盘才扛得住。而 Blob 单独一个集群，峰值也只用到供给的四分之一左右，剩下的全在吃灰。合到一起后，合计需求最高 0.72，远低于 1.00。开头那个"一家厨房不够、隔壁厨房吃灰"的比喻，在这里变成了实打实的数字。</p>
 
-<figure><img src="09-results.png" alt="关键结果图解"><figcaption>图解 5：按磁盘时间归一化的供需对比（对应论文 Table 3 与 Figure 4a/4b）。</figcaption></figure>
+<figure><img src="09-results.png" alt="关键结果图解"><figcaption>图解 5：Table 3 三个日峰值的磁盘时间供需：数仓需求每次都超过它的独立供给 0.51，Blob 大量闲置，合计始终低于 1.00；顶部是 Table 2 的集群规模。</figcaption></figure>
 
 <p>再看延迟。Figure 3b、3c 显示，Tectonic 上 Blob 的读写延迟和 Haystack 基本相当，用了 quorum append 的写延迟明显好于普通追加。Figure 3a 里，在 80% 负载的测试集群上，hedged quorum 写让 72 MB 整块写的 P99 延迟改善了约 20%。元数据方面（Figure 4c），每个分片上限 10K QPS，File 层和 Block 层的分片全部在线以下，Name 层只有约 1% 的分片因为装着特别热的目录碰到上限，靠退避重试消化掉了。</p>
 

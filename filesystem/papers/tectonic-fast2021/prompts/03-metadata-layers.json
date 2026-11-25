@@ -1,14 +1,14 @@
 {
-  "prompt": "【类型】机制拆解图\n【主题】Tectonic 元数据 schema 与分片方式\n【视觉结构】\n- 上半部：一张手绘三行表格（每行一种颜色）\n  Name 层 | 键 (dir_id, 子目录名/文件名) | 值 子目录/文件 ID | 按 dir_id 分片\n  File 层 | 键 (file_id, blk_id) | 值 block 信息 | 按 file_id 分片\n  Block 层 | 键 blk_id → 磁盘列表；反向索引 (disk_id, blk_id) | 按 blk_id 分片\n- 左下：\"展开存储\"小例子：目录 d1 有文件 foo、bar → 不存成一个大列表，而是两个键 \"(d1, foo)\" \"(d1, bar)\"；旁注 \"建/删文件不必读写整个列表，列目录=前缀扫描\"\n- 右下：对比两棵目录树\n  左树标 \"范围分区（ADLS）\"：同一子树全塞进一个 shard，shard 冒火焰图标 \"热点！\"\n  右树标 \"hash 分区（Tectonic）\"：子目录分散到多个 shard 小桶，均匀，绿色对勾\n- 底部便签：\"约 2/3 的元数据操作落在 Block 层，hash 让它们均匀分布\"；\"已封存（sealed）的对象元数据可缓存在客户端\"\n【语言】中文（英文术语按原样保留，不要改写拼写）\n【必须出现的标签】Name 层、File 层、Block 层、hash 分区、范围分区、展开存储、shard、热点\n【风格】sketchnote 科研手抄报：明亮浅米白底(#FFF8EA)，黑色手绘线条，墨迹粗细变化；强调色只用深蓝/珊瑚红/橄榄绿/柔和黄色，清爽不过饱和；手绘感箭头；中文手写体但清晰可读；可少量放大镜、星号、便签、圈注等趣味符号，但服务理解；主体图解占画面75%-85%；右下角手写页码。\n【禁止】不要代码块、照片写实、3D渲染；不要旧羊皮纸、暗角、污渍、黄褐色复古调；不要大面积空白；不要随机英文或拼写变体；不要水印、广告风格、伪论文截图；不要图标题以外的长段正文。\n页码：4/10",
-  "negativePrompt": "水印，模糊文字，错乱标签，随机英文，拼写错误，旧羊皮纸，暗角，污渍，3D渲染，照片写实，大面积空白，广告风格",
+  "prompt": "【类型】机制拆解图\n【主题】Tectonic 元数据 schema 与分片方式\n【视觉结构】上半一张表，下半左右两个小图\n- 上半：一张干净的三行表（每行左侧一条深蓝色块标识层名），列为 \"层 | 键 | 值 | 分片键\"\n  \"Name 层\" | (dir_id, 子目录名 / 文件名) | 子目录 / 文件 ID | 按 dir_id\n  \"File 层\" | (file_id, blk_id) | block 信息 | 按 file_id\n  \"Block 层\" | blk_id，及反向索引 (disk_id, blk_id) | 磁盘列表 | 按 blk_id\n- 左下 \"展开存储\" 示例：目录 d1 下有 foo、bar → 不存成一个列表值，而是两个独立键 \"(d1, foo)\"、\"(d1, bar)\"；短标签 \"建 / 删文件不读写整个列表 · 列目录 = 前缀扫描\"\n- 右下：两棵目录树对比\n  左树 \"范围分区（如 ADLS）\"：整棵子树落在一个 shard 方框里，该 shard 橙色高亮并标 \"热点\"\n  右树 \"hash 分区（Tectonic）\"：各目录分散到多个 shard 小方框，负载均匀，深蓝对勾\n- 底部一行短标签：\"约 2/3 的元数据操作落在 Block 层，hash 让它们均匀分布\" · \"已封存（sealed）对象的元数据可缓存在客户端\"\n【语言】中文（英文术语、变量名按原样保留，不要改写拼写）\n【必须出现的标签】Name 层、File 层、Block 层、hash 分区、范围分区、展开存储、shard、热点\n【风格】paper-figure：像 FAST/OSDI 顶会论文中重新设计过的高质量方法总览图。纯白或极浅灰底；干净的矢量感模块（圆角矩形、分组框、键值小格、编号步骤圆点）；无衬线字体短标签；黑/深灰为主色，只用两个强调色：深蓝（Tectonic 的核心设计/关键路径）与橙色（问题、热点、对比项、校验/冗余部分）；需要区分类别时只用这两色的深浅和灰色；主路径箭头粗、辅助箭头细；主体图解占画面 75%-85%，信息密度高但不拥挤；右下角小号页码。\n【禁止】不要手绘风、不要便签纸、不要卡通小人和装饰性图标、不要蓝底白线工程图纸风、不要 3D 渲染、不要照片写实、不要渐变和过饱和色；不要营销海报或 PPT 封面感；不要大段说明文字；不要随机英文或拼写变体；不要水印；不要复刻论文原图布局。\n页码：4/10",
+  "negativePrompt": "手绘，涂鸦，便签纸，卡通，蓝图风，3D渲染，照片写实，渐变，过饱和，海报风，水印，模糊文字，错乱标签，随机英文，拼写错误，大面积空白",
   "aspectRatio": "16:9",
   "imageSize": "1K",
   "caption": "分层 + hash 分区的元数据：为什么没有热点",
-  "intent": "元数据拆成 Name/File/Block 三层，每层按 ID hash 分片；展开存储列表；对比 ADLS 的范围分区",
+  "intent": "元数据拆为 Name/File/Block 三层，各自按 ID hash 分片存于 ZippyDB；目录项展开为独立键；hash 分区避免范围分区下的子树热点",
   "figure_spec": {
     "figure_kind": "mechanism schematic",
     "caption": "分层 + hash 分区的元数据：为什么没有热点",
-    "communicative_intent": "元数据拆成 Name/File/Block 三层，每层按 ID hash 分片；展开存储列表；对比 ADLS 的范围分区",
+    "communicative_intent": "元数据拆为 Name/File/Block 三层，各自按 ID hash 分片存于 ZippyDB；目录项展开为独立键；hash 分区避免范围分区下的子树热点",
     "required_labels": [
       "Name 层",
       "File 层",
@@ -21,7 +21,7 @@
     ],
     "forbidden_labels": [],
     "layout_brief": "横版 16:9，见 prompt 视觉结构",
-    "style_brief": "sketchnote 明亮科研手抄报，中文",
+    "style_brief": "paper-figure 顶会框架图风，中文",
     "source_context": "Pan et al., Facebook's Tectonic Filesystem: Efficiency from Exascale, FAST 2021"
   }
 }

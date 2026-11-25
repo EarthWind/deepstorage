@@ -100,7 +100,7 @@ flowchart LR
     BG -.-> CS
 </pre>
 
-<figure><img src="01-architecture.png" alt="Tectonic 架构图解"><figcaption>图解：对应论文 Figure 2，标出一次读的四步路径（本仓库生成的示意图，非论文原图）。</figcaption></figure>
+<figure><img src="01-architecture.png" alt="Tectonic 架构图解"><figcaption>图解：对应论文 Figure 2，Client Library 依次查 Name、File、Block 三层元数据，再直连存储节点读写 chunk（①–④）；灰色为无状态组件（本仓库重新绘制的示意图，非论文原图）。</figcaption></figure>
 
 <h3>3.2 创新一：扁平 Chunk Store 与按 block 选择持久性</h3>
 
@@ -265,7 +265,7 @@ $$\max_t \sum_j D_j(t) \;\le\; \sum_j S_j, \qquad \text{overprovision}_{\text{WH
 
 <p>前一式说明整合把逐租户的峰值约束放松为总量约束；后一式由 Table 3 复算出数仓单独部署时所需的超额配置，与论文给出的"约 17%"一致。三天内数仓的每个日峰值都超过其独立供给，而 Blob 峰值需求仅为其供给的约四分之一。Figure 4a、4b 显示了两类流量形态的差异：数仓由超大作业触发规律性的尖峰，Blob 流量平稳可预测。整合的收益正来自这种负载形态的互补，而非来自单一负载的优化。</p>
 
-<figure><img src="09-results.png" alt="关键结果图解"><figcaption>图解：Table 3 的供需对比与 Table 2 的集群规模。</figcaption></figure>
+<figure><img src="09-results.png" alt="关键结果图解"><figcaption>图解：Table 3 三个日峰值的需求（数仓 0.60/0.54/0.57，Blob 0.12/0.14/0.11）与独立供给 0.51/0.49、合并供给 1.00 的对比；顶部为 Table 2 的集群规模。</figcaption></figure>
 
 <h3>4.3 延迟与元数据负载</h3>
 
